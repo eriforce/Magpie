@@ -45,7 +45,7 @@ struct _AppSettingsData {
 
 	// 上一次自动检查更新的日期
 	std::chrono::system_clock::time_point _updateCheckDate;
-	
+
 	bool _isPortableMode = false;
 	bool _isAlwaysRunAsAdmin = false;
 	bool _isDebugMode = false;
@@ -336,6 +336,10 @@ private:
 		const rapidjson::GenericObject<true, rapidjson::Value>& profileObj,
 		Profile& profile,
 		bool isDefault = false
+	);
+	bool _LoadProfileApplication(
+		const rapidjson::GenericObject<true, rapidjson::Value>& applicationObj,
+		ProfileApplication& application
 	);
 	bool _SetDefaultShortcuts();
 	void _SetDefaultScalingModes();

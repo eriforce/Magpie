@@ -144,6 +144,7 @@
       <DependentUpon>KeyVisualState.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClInclude>
+    <ClInclude Include="ProfileApplication.h" />
     <ClInclude Include="ShortcutService.h" />
     <ClInclude Include="Shortcut.h" />
     <ClInclude Include="IconHelper.h" />

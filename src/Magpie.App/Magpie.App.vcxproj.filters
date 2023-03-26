@@ -114,6 +114,9 @@
     <ClInclude Include="LocalizationService.h">
       <Filter>Services</Filter>
     </ClInclude>
+    <ClInclude Include="ProfileApplication.h">
+      <Filter>Models</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Pages">

@@ -4,6 +4,7 @@
 
 namespace winrt::Magpie::App {
 struct Profile;
+struct ProfileApplication;
 }
 
 namespace winrt::Magpie::App::implementation {
@@ -27,7 +28,7 @@ struct ProfileViewModel : ProfileViewModelT<ProfileViewModel> {
 	bool IsNotDefaultProfile() const noexcept;
 
 	bool IsProgramExist() const noexcept {
-		return _isProgramExist;
+		return _existingApplication != nullptr;
 	}
 
 	fire_and_forget OpenProgramLocation() const noexcept;
@@ -143,8 +144,6 @@ struct ProfileViewModel : ProfileViewModelT<ProfileViewModel> {
 private:
 	fire_and_forget _LoadIcon(FrameworkElement const& mainPage);
 
-	bool _isProgramExist = true;
-
 	hstring _renameText;
 	std::wstring_view _trimedRenameText;
 
@@ -157,6 +156,7 @@ private:
 	uint32_t _index = 0;
 	// 可以保存此指针的原因是：用户停留在此页面时不会有缩放配置被创建或删除
 	Profile* _data = nullptr;
+	ProfileApplication* _existingApplication = nullptr;
 
 	MainPage::ActualThemeChanged_revoker _themeChangedRevoker;
 	Windows::Graphics::Display::DisplayInformation _displayInformation{ nullptr };
