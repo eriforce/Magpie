@@ -4,6 +4,8 @@
 #include "AppSettings.h"
 #include "AppXReader.h"
 #include <regex>
+#include "Logger.h"
+#include "StrUtils.h"
 
 namespace winrt::Magpie::App {
 
@@ -40,15 +42,19 @@ static bool RealTestNewProfile(
 	const std::vector<Profile>& profiles = AppSettings::Get().Profiles();
 
 	if (isPackaged) {
-		for (const Profile& rule : profiles) {
-			if (rule.isPackaged && rule.pathRule == pathOrAumid && rule.classNameRule == realClassName) {
-				return false;
+		for (const Profile& profile : profiles) {
+			for (const ProfileApplication& rule : profile.applications) {
+				if (rule.isPackaged && rule.pathRule == pathOrAumid && rule.classNameRule == realClassName) {
+					return false;
+				}
 			}
 		}
 	} else {
-		for (const Profile& rule : profiles) {
-			if (!rule.isPackaged && rule.pathRule == pathOrAumid && rule.classNameRule == realClassName) {
-				return false;
+		for (const Profile& profile : profiles) {
+			for (const ProfileApplication& rule : profile.applications) {
+				if (!rule.isPackaged && rule.GetTruePath() == pathOrAumid && rule.classNameRule == realClassName) {
+					return false;
+				}
 			}
 		}
 	}
@@ -85,9 +91,11 @@ bool ProfileService::AddProfile(
 	profile.Copy(copyFrom < 0 ? DefaultProfile() : profiles[copyFrom]);
 
 	profile.name = name;
-	profile.isPackaged = isPackaged;
-	profile.pathRule = pathOrAumid;
-	profile.classNameRule = realClassName;
+
+	ProfileApplication& application = profile.applications.emplace_back();
+	application.isPackaged = isPackaged;
+	application.pathRule = pathOrAumid;
+	application.classNameRule = realClassName;
 
 	_profileAddedEvent(std::ref(profile));
 
@@ -122,6 +130,43 @@ bool ProfileService::MoveProfile(uint32_t profileIdx, bool isMoveUp) {
 	return true;
 }
 
+bool ProfileService::AddApplication(uint32_t profileIdx, bool isPackaged, std::wstring_view pathOrAumid, std::wstring_view className) {
+	assert(profileIdx >= 0 && !pathOrAumid.empty() && !className.empty());
+
+	std::wstring_view realClassName = GetRealClassName(className);
+
+	if (!RealTestNewProfile(isPackaged, pathOrAumid, realClassName)) {
+		return false;
+	}
+
+	Profile& profile = GetProfile(profileIdx);
+	ProfileApplication& application = profile.applications.emplace_back();
+	application.isPackaged = isPackaged;
+	application.pathRule = pathOrAumid;
+	application.classNameRule = realClassName;
+
+	uint32_t applicationIdx = static_cast<uint32_t>(profile.applications.size() - 1);
+	_applicationAddedEvent(profileIdx, applicationIdx);
+
+	AppSettings::Get().SaveAsync();
+	return true;
+}
+
+void ProfileService::RemoveApplication(uint32_t profileIdx, uint32_t applicationIdx) {
+	Profile& profile = GetProfile(profileIdx);
+	profile.applications.erase(profile.applications.begin() + applicationIdx);
+	_applicationRemovedEvent(profileIdx, applicationIdx);
+	AppSettings::Get().SaveAsync();
+}
+
+void ProfileService::MoveApplication(uint32_t profileIdx, uint32_t fromIdx, uint32_t toIdx) {
+	std::vector<ProfileApplication>& applications = GetProfile(profileIdx).applications;
+	ProfileApplication application = std::move(applications[fromIdx]);
+	applications.erase(applications.begin() + fromIdx);
+	applications.emplace(applications.begin() + toIdx, std::move(application));
+	AppSettings::Get().SaveAsync();
+}
+
 Profile& ProfileService::GetProfileForWindow(HWND hWnd) {
 	std::wstring className = Win32Utils::GetWndClassName(hWnd);
 	std::wstring_view realClassName = GetRealClassName(className);
@@ -130,18 +175,22 @@ Profile& ProfileService::GetProfileForWindow(HWND hWnd) {
 	if (appXReader.Initialize(hWnd)) {
 		// 打包的应用程序匹配 AUMID 和 类名
 		const std::wstring& aumid = appXReader.AUMID();
-		for (Profile& rule : AppSettings::Get().Profiles()) {
-			if (rule.isPackaged && rule.pathRule == aumid && rule.classNameRule == realClassName) {
-				return rule;
+		for (Profile& profile : AppSettings::Get().Profiles()) {
+			for (ProfileApplication& rule : profile.applications) {
+				if (rule.isPackaged && rule.pathRule == aumid && rule.classNameRule == realClassName) {
+					return profile;
+				}
 			}
 		}
 	} else {
 		// 桌面程序匹配类名和可执行文件名
 		std::wstring path = Win32Utils::GetPathOfWnd(hWnd);
 
-		for (Profile& rule : AppSettings::Get().Profiles()) {
-			if (!rule.isPackaged && rule.pathRule == path && rule.classNameRule == realClassName) {
-				return rule;
+		for (Profile& profile : AppSettings::Get().Profiles()) {
+			for (ProfileApplication& rule : profile.applications) {
+				if (!rule.isPackaged && rule.GetTruePath() == path && rule.classNameRule == realClassName) {
+					return profile;
+				}
 			}
 		}
 	}

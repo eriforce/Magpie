@@ -15,6 +15,8 @@ std::string ShortcutHelper::ToString(winrt::Magpie::App::ShortcutAction action) 
 		return "Overlay";
 	case ShortcutAction::COUNT_OR_NONE:
 		return "None";
+	case ShortcutAction::Is3DGameMode:
+		return "3DGameMode";
 	default:
 		break;
 	}
@@ -128,6 +130,8 @@ hstring to_hstring(ShortcutAction action) {
 		return L"Overlay";
 	case ShortcutAction::COUNT_OR_NONE:
 		return L"None";
+	case ShortcutAction::Is3DGameMode:
+		return L"3DGameMode";
 	default:
 		break;
 	}

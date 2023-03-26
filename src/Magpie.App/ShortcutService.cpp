@@ -35,6 +35,7 @@ void ShortcutService::Initialize() {
 
 	_RegisterShortcut(ShortcutAction::Scale);
 	_RegisterShortcut(ShortcutAction::Overlay);
+	_RegisterShortcut(ShortcutAction::Is3DGameMode);
 
 	AppSettings::Get().ShortcutChanged({ this, &ShortcutService::_AppSettings_OnShortcutChanged });
 
@@ -205,9 +206,9 @@ LRESULT CALLBACK ShortcutService::_LowLevelKeyboardProc(int nCode, WPARAM wParam
 					co_await CoreWindow::GetForCurrentThread().Dispatcher().TryRunAsync(
 						CoreDispatcherPriority::Normal,
 						[action]() {
-							Logger::Get().Info(fmt::format("热键 {} 激活（Keyboard Hook）", ShortcutHelper::ToString(action)));
-							Get()._FireShortcut(action);
-						}
+						Logger::Get().Info(fmt::format("热键 {} 激活（Keyboard Hook）", ShortcutHelper::ToString(action)));
+						Get()._FireShortcut(action);
+					}
 					);
 				}(action);
 

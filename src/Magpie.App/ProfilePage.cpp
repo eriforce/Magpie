@@ -10,11 +10,16 @@
 
 using namespace winrt;
 using namespace Windows::Globalization::NumberFormatting;
+using namespace Windows::Graphics::Display;
 using namespace Windows::UI::Xaml::Controls;
 using namespace Windows::UI::Xaml::Controls::Primitives;
 using namespace Windows::UI::Xaml::Input;
 
 namespace winrt::Magpie::App::implementation {
+
+ProfilePage::ProfilePage() {
+	_displayInformation = DisplayInformation::GetForCurrentView();
+}
 
 void ProfilePage::InitializeComponent() {
 	ProfilePageT::InitializeComponent();
@@ -28,6 +33,7 @@ void ProfilePage::InitializeComponent() {
 void ProfilePage::OnNavigatedTo(Navigation::NavigationEventArgs const& args) {
 	int profileIdx = args.Parameter().as<int>();
 	_viewModel = ProfileViewModel(profileIdx);
+	_newApplicationViewModel = NewApplicationViewModel(profileIdx);
 }
 
 void ProfilePage::ComboBox_DropDownOpened(IInspectable const& sender, IInspectable const&) {
@@ -59,7 +65,7 @@ INumberFormatter2 ProfilePage::NumberFormatter() noexcept {
 		result.FractionDigits(0);
 		return result;
 	}();
-	
+
 	return numberFormatter;
 }
 
@@ -98,20 +104,16 @@ void ProfilePage::DeleteButton_Click(IInspectable const&, RoutedEventArgs const&
 	_viewModel.Delete();
 }
 
-void ProfilePage::EditLaunchParametersButton_Click(IInspectable const&, RoutedEventArgs const&) {
-	_viewModel.IsEditingLaunchParameters(true);
-	LaunchParametersTextBox().Select(LaunchParametersTextBox().Text().size(), 0);
-	LaunchParametersTextBox().Focus(FocusState::Programmatic);
+void ProfilePage::AddApplicationButton_Click(IInspectable const&, RoutedEventArgs const&) {
+	const UINT dpi = (UINT)std::lroundf(_displayInformation.LogicalDpi());
+	const bool isLightTheme = ActualTheme() == ElementTheme::Light;
+	_newApplicationViewModel.PrepareForOpen(dpi, isLightTheme, Dispatcher());
+	NewApplicationFlyout().ShowAt(AddApplicationButton());
 }
 
-void ProfilePage::LaunchParametersTextBox_LostFocus(IInspectable const&, RoutedEventArgs const&) {
-	_viewModel.IsEditingLaunchParameters(false);
-}
-
-void ProfilePage::LaunchParametersTextBox_KeyDown(IInspectable const&, Input::KeyRoutedEventArgs const& args) {
-	if (args.Key() == VirtualKey::Enter) {
-		Focus(FocusState::Pointer);
-	}
+void ProfilePage::NewApplicationConfirmButton_Click(IInspectable const&, RoutedEventArgs const&) {
+	_newApplicationViewModel.Confirm();
+	NewApplicationFlyout().Hide();
 }
 
 }

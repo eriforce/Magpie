@@ -4,12 +4,18 @@
 namespace winrt::Magpie::App::implementation {
 
 struct ProfilePage : ProfilePageT<ProfilePage> {
+	ProfilePage();
+
 	void InitializeComponent();
 
 	void OnNavigatedTo(Navigation::NavigationEventArgs const& args);
 
 	Magpie::App::ProfileViewModel ViewModel() const noexcept {
 		return _viewModel;
+	}
+
+	Magpie::App::NewApplicationViewModel NewAppViewModel() const noexcept {
+		return _newApplicationViewModel;
 	}
 
 	void ComboBox_DropDownOpened(IInspectable const& sender, IInspectable const&);
@@ -32,15 +38,15 @@ struct ProfilePage : ProfilePageT<ProfilePage> {
 
 	void DeleteButton_Click(IInspectable const&, RoutedEventArgs const&);
 
-	void EditLaunchParametersButton_Click(IInspectable const&, RoutedEventArgs const&);
+	void AddApplicationButton_Click(IInspectable const&, RoutedEventArgs const&);
 
-	void LaunchParametersTextBox_LostFocus(IInspectable const&, RoutedEventArgs const&);
-
-	void LaunchParametersTextBox_KeyDown(IInspectable const&, Input::KeyRoutedEventArgs const& args);
+	void NewApplicationConfirmButton_Click(IInspectable const&, RoutedEventArgs const&);
 
 private:
 	Magpie::App::ProfileViewModel _viewModel{ nullptr };
+	Magpie::App::NewApplicationViewModel _newApplicationViewModel{ nullptr };
 	Windows::Globalization::NumberFormatting::DecimalFormatter _numberFormatter;
+	Windows::Graphics::Display::DisplayInformation _displayInformation{ nullptr };
 };
 
 }

@@ -1,9 +1,11 @@
 #pragma once
 #include "ProfileViewModel.g.h"
 #include "SmallVector.h"
+#include "WinRTUtils.h"
 
 namespace winrt::Magpie::App {
 struct Profile;
+struct ProfileApplication;
 }
 
 namespace winrt::Magpie::App::implementation {
@@ -20,21 +22,9 @@ struct ProfileViewModel : ProfileViewModelT<ProfileViewModel> {
 		_propertyChangedEvent.remove(token);
 	}
 
-	Controls::IconElement Icon() const noexcept {
-		return _icon;
-	}
-
 	bool IsNotDefaultProfile() const noexcept;
 
-	bool IsProgramExist() const noexcept {
-		return _isProgramExist;
-	}
-
-	fire_and_forget OpenProgramLocation() const noexcept;
-
 	hstring Name() const noexcept;
-
-	void Launch() const noexcept;
 
 	hstring RenameText() const noexcept {
 		return _renameText;
@@ -57,6 +47,10 @@ struct ProfileViewModel : ProfileViewModelT<ProfileViewModel> {
 	void MoveDown();
 
 	void Delete();
+
+	IObservableVector<IInspectable> Applications() const noexcept {
+		return _applications;
+	}
 
 	IVector<IInspectable> ScalingModes() const noexcept {
 		return _scalingModes;
@@ -137,26 +131,21 @@ struct ProfileViewModel : ProfileViewModelT<ProfileViewModel> {
 	int CursorInterpolationMode() const noexcept;
 	void CursorInterpolationMode(int value);
 
-	hstring LaunchParameters() const noexcept;
-	void LaunchParameters(const hstring& value);
-
-	bool IsEditingLaunchParameters() const noexcept {
-		return _isEditingLaunchParameters;
-	}
-
-	void IsEditingLaunchParameters(bool value);
-
 	bool IsDisableDirectFlip() const noexcept;
 	void IsDisableDirectFlip(bool value);
 
 private:
-	fire_and_forget _LoadIcon(FrameworkElement const& mainPage);
+	void _ProfileService_ApplicationAdded(uint32_t profileIdx, uint32_t applicationIdx);
+	void _ProfileService_ApplicationRemoved(uint32_t profileIdx, uint32_t applicationIdx);
 
-	bool _isProgramExist = true;
+	void _Applications_VectorChanged(IObservableVector<IInspectable> const&, IVectorChangedEventArgs const& args);
+
+	void _MagService_Is3DGameModeChanged(bool value);
 
 	hstring _renameText;
 	std::wstring_view _trimedRenameText;
 
+	IObservableVector<IInspectable> _applications = single_threaded_observable_vector<IInspectable>();
 	IVector<IInspectable> _scalingModes{ nullptr };
 	IVector<IInspectable> _captureMethods{ nullptr };
 	SmallVector<std::wstring> _graphicsCards;
@@ -170,12 +159,14 @@ private:
 	MainPage::ActualThemeChanged_revoker _themeChangedRevoker;
 	Windows::Graphics::Display::DisplayInformation _displayInformation{ nullptr };
 	Windows::Graphics::Display::DisplayInformation::DpiChanged_revoker _dpiChangedRevoker;
-
-	Controls::IconElement _icon{ nullptr };
+	WinRTUtils::EventRevoker _applicationAddedRevoker;
+	WinRTUtils::EventRevoker _applicationRemovedRevoker;
+	WinRTUtils::EventRevoker _is3DGameModeChangedRevoker;
 
 	const bool _isDefaultProfile = true;
 	bool _isRenameConfirmButtonEnabled = false;
-	bool _isEditingLaunchParameters = false;
+	bool _isMovingApplication = true;
+	uint32_t _applicationMovingFromIdx = 0;
 };
 
 }

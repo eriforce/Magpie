@@ -60,37 +60,6 @@ ProfileViewModel::ProfileViewModel(int profileIdx) : _isDefaultProfile(profileId
 	} else {
 		_index = (uint32_t)profileIdx;
 		_data = &ProfileService::Get().GetProfile(profileIdx);
-
-		// 占位
-		_icon = FontIcon();
-
-		App app = Application::Current().as<App>();
-		MainPage mainPage = app.MainPage();
-		_themeChangedRevoker = mainPage.ActualThemeChanged(
-			auto_revoke,
-			[this](FrameworkElement const& sender, IInspectable const&) {
-				_LoadIcon(sender);
-			}
-		);
-
-		_displayInformation = DisplayInformation::GetForCurrentView();
-		_dpiChangedRevoker = _displayInformation.DpiChanged(
-			auto_revoke,
-			[this](DisplayInformation const&, IInspectable const&) {
-				if (MainPage mainPage = Application::Current().as<App>().MainPage()) {
-					_LoadIcon(mainPage);
-				}
-			}
-		);
-
-		if (_data->isPackaged) {
-			AppXReader appxReader;
-			_isProgramExist = appxReader.Initialize(_data->pathRule);
-		} else {
-			_isProgramExist = Win32Utils::FileExists(_data->pathRule.c_str());
-		}
-
-		_LoadIcon(mainPage);
 	}
 
 	ResourceLoader resourceLoader = ResourceLoader::GetForCurrentView();
@@ -117,41 +86,69 @@ ProfileViewModel::ProfileViewModel(int profileIdx) : _isDefaultProfile(profileId
 		_captureMethods = single_threaded_vector(std::move(captureMethods));
 	}
 
+	{
+		std::vector<IInspectable> applications;
+		applications.reserve(_data->applications.size());
+		for (UINT i = 0; i < _data->applications.size(); i++) {
+			_applications.Append(ProfileApplicationItem(profileIdx, i));
+		}
+		_applications.VectorChanged({ this, &ProfileViewModel::_Applications_VectorChanged });
+	}
+
 	_graphicsCards = GetAllGraphicsCards();
 	if (_data->graphicsCard >= _graphicsCards.size()) {
 		_data->graphicsCard = -1;
 	}
+
+	_applicationAddedRevoker = ProfileService::Get().ApplicationAdded(
+		auto_revoke, { this, &ProfileViewModel::_ProfileService_ApplicationAdded });
+	_applicationRemovedRevoker = ProfileService::Get().ApplicationRemoved(
+		auto_revoke, { this, &ProfileViewModel::_ProfileService_ApplicationRemoved });
+	_is3DGameModeChangedRevoker = MagService::Get().Is3DGameModeChanged(
+		auto_revoke, { this, &ProfileViewModel::_MagService_Is3DGameModeChanged });
 }
 
 ProfileViewModel::~ProfileViewModel() {}
 
-bool ProfileViewModel::IsNotDefaultProfile() const noexcept {
-	return !_data->name.empty();
+void ProfileViewModel::_ProfileService_ApplicationAdded(uint32_t profileIdx, uint32_t applicationIdx) {
+	_isMovingApplication = false;
+	_applications.Append(ProfileApplicationItem(profileIdx, applicationIdx));
+	_isMovingApplication = true;
 }
 
-fire_and_forget ProfileViewModel::OpenProgramLocation() const noexcept {
-	if (!_isProgramExist) {
-		co_return;
+void ProfileViewModel::_ProfileService_ApplicationRemoved(uint32_t, uint32_t applicationIdx) {
+	_isMovingApplication = false;
+	_applications.RemoveAt(applicationIdx);
+	_isMovingApplication = true;
+}
+
+void ProfileViewModel::_Applications_VectorChanged(IObservableVector<IInspectable> const&, IVectorChangedEventArgs const& args) {
+	if (!_isMovingApplication) {
+		return;
 	}
 
-	std::wstring programLocation;
-	if (_data->isPackaged) {
-		AppXReader appxReader;
-		[[maybe_unused]] bool result = appxReader.Initialize(_data->pathRule);
-		assert(result);
-
-		programLocation = appxReader.GetExecutablePath();
-		if (programLocation.empty()) {
-			// 找不到可执行文件则打开应用文件夹
-			Win32Utils::ShellOpen(appxReader.GetPackagePath().c_str());
-			co_return;
-		}
-	} else {
-		programLocation = _data->pathRule;
+	if (args.CollectionChange() == CollectionChange::ItemRemoved) {
+		_applicationMovingFromIdx = args.Index();
+		return;
 	}
 
-	co_await resume_background();
-	Win32Utils::OpenFolderAndSelectFile(programLocation.c_str());
+	assert(args.CollectionChange() == CollectionChange::ItemInserted);
+	uint32_t movingToIdx = args.Index();
+	ProfileService::Get().MoveApplication(_index, _applicationMovingFromIdx, movingToIdx);
+
+	uint32_t minIdx = std::min(_applicationMovingFromIdx, movingToIdx);
+	uint32_t maxIdx = std::max(_applicationMovingFromIdx, movingToIdx);
+	for (uint32_t i = minIdx; i <= maxIdx; ++i) {
+		_applications.GetAt(i).as<ProfileApplicationItem>().ApplicationIdx(i);
+	}
+}
+
+void ProfileViewModel::_MagService_Is3DGameModeChanged(bool) {
+	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"Is3DGameMode"));
+}
+
+bool ProfileViewModel::IsNotDefaultProfile() const noexcept {
+	return !_data->name.empty();
 }
 
 hstring ProfileViewModel::Name() const noexcept {
@@ -159,44 +156,6 @@ hstring ProfileViewModel::Name() const noexcept {
 		return ResourceLoader::GetForCurrentView().GetString(L"Main_Defaults/Content");
 	} else {
 		return hstring(_data->name);
-	}
-}
-
-static void LaunchPackagedApp(const Profile& profile) {
-	// 关于启动打包应用的讨论：
-	// https://github.com/microsoft/WindowsAppSDK/issues/2856#issuecomment-1224409948
-	// 使用 CLSCTX_LOCAL_SERVER 以在独立的进程中启动应用
-	// 见 https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-iapplicationactivationmanager
-	com_ptr<IApplicationActivationManager> aam =
-		try_create_instance<IApplicationActivationManager>(CLSID_ApplicationActivationManager, CLSCTX_LOCAL_SERVER);
-	if (!aam) {
-		Logger::Get().Error("创建 ApplicationActivationManager 失败");
-		return;
-	}
-
-	// 确保启动为前台窗口
-	HRESULT hr = CoAllowSetForegroundWindow(aam.get(), nullptr);
-	if (FAILED(hr)) {
-		Logger::Get().ComError("创建 CoAllowSetForegroundWindow 失败", hr);
-	}
-
-	DWORD procId;
-	hr = aam->ActivateApplication(profile.pathRule.c_str(), profile.launchParameters.c_str(), AO_NONE, &procId);
-	if (FAILED(hr)) {
-		Logger::Get().ComError("IApplicationActivationManager::ActivateApplication 失败", hr);
-		return;
-	}
-}
-
-void ProfileViewModel::Launch() const noexcept {
-	if (!_isProgramExist) {
-		return;
-	}
-
-	if (_data->isPackaged) {
-		LaunchPackagedApp(*_data);
-	} else {
-		Win32Utils::ShellOpen(_data->pathRule.c_str(), _data->launchParameters.c_str());
 	}
 }
 
@@ -652,28 +611,6 @@ void ProfileViewModel::CursorInterpolationMode(int value) {
 	AppSettings::Get().SaveAsync();
 }
 
-hstring ProfileViewModel::LaunchParameters() const noexcept {
-	return hstring(_data->launchParameters);
-}
-
-void ProfileViewModel::LaunchParameters(const hstring& value) {
-	std::wstring_view trimmed(value);
-	StrUtils::Trim(trimmed);
-	_data->launchParameters = trimmed;
-	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"LaunchParameters"));
-
-	AppSettings::Get().SaveAsync();
-}
-
-void ProfileViewModel::IsEditingLaunchParameters(bool value) {
-	if (_isEditingLaunchParameters == value) {
-		return;
-	}
-
-	_isEditingLaunchParameters = value;
-	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"IsEditingLaunchParameters"));
-}
-
 bool ProfileViewModel::IsDisableDirectFlip() const noexcept {
 	return _data->IsDisableDirectFlip();
 }
@@ -687,65 +624,6 @@ void ProfileViewModel::IsDisableDirectFlip(bool value) {
 	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"IsDisableDirectFlip"));
 
 	AppSettings::Get().SaveAsync();
-}
-
-fire_and_forget ProfileViewModel::_LoadIcon(FrameworkElement const& mainPage) {
-	std::wstring iconPath;
-	SoftwareBitmap iconBitmap{ nullptr };
-
-	if (_isProgramExist) {
-		auto weakThis = get_weak();
-
-		const bool preferLightTheme = mainPage.ActualTheme() == ElementTheme::Light;
-		const bool isPackaged = _data->isPackaged;
-		const std::wstring path = _data->pathRule;
-		CoreDispatcher dispatcher = mainPage.Dispatcher();
-		const uint32_t dpi = (uint32_t)std::lroundf(_displayInformation.LogicalDpi());
-
-		co_await resume_background();
-
-		static constexpr const UINT ICON_SIZE = 32;
-		if (isPackaged) {
-			AppXReader appxReader;
-			[[maybe_unused]] bool result = appxReader.Initialize(path);
-			assert(result);
-
-			std::variant<std::wstring, SoftwareBitmap> uwpIcon =
-				appxReader.GetIcon((uint32_t)std::ceil(dpi * ICON_SIZE / double(USER_DEFAULT_SCREEN_DPI)), preferLightTheme);
-			if (uwpIcon.index() == 0) {
-				iconPath = std::get<0>(uwpIcon);
-			} else {
-				iconBitmap = std::get<1>(uwpIcon);
-			}
-		} else {
-			iconBitmap = IconHelper::ExtractIconFromExe(path.c_str(), ICON_SIZE, dpi);
-		}
-
-		co_await dispatcher;
-		if (!weakThis.get()) {
-			co_return;
-		}
-	}
-
-	if (!iconPath.empty()) {
-		BitmapIcon icon;
-		icon.ShowAsMonochrome(false);
-		icon.UriSource(Uri(iconPath));
-
-		_icon = std::move(icon);
-	} else if (iconBitmap) {
-		SoftwareBitmapSource imageSource;
-		co_await imageSource.SetBitmapAsync(iconBitmap);
-
-		MUXC::ImageIcon imageIcon;
-		imageIcon.Source(imageSource);
-
-		_icon = std::move(imageIcon);
-	} else {
-		_icon = nullptr;
-	}
-
-	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"Icon"));
 }
 
 }

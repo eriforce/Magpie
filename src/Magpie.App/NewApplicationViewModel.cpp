@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "NewProfileViewModel.h"
-#if __has_include("NewProfileViewModel.g.cpp")
-#include "NewProfileViewModel.g.cpp"
+#include "NewApplicationViewModel.h"
+#if __has_include("NewApplicationViewModel.g.cpp")
+#include "NewApplicationViewModel.g.cpp"
 #endif
 #include "AppSettings.h"
 #include "Win32Utils.h"
@@ -45,7 +45,7 @@ static bool IsCandidateWindow(HWND hWnd) {
 	std::wstring className = Win32Utils::GetWndClassName(hWnd);
 	if (className == L"Progman" ||					// Program Manager
 		className == L"Xaml_WindowedPopupClass"		// 主机弹出窗口
-	) {
+		) {
 		return false;
 	}
 
@@ -65,18 +65,18 @@ static bool IsCandidateWindow(HWND hWnd) {
 
 static SmallVector<HWND> GetDesktopWindows() {
 	SmallVector<HWND> windows;
-	
+
 	// EnumWindows 可以枚举到 UWP 窗口，官方文档已经过时。无法枚举到全屏状态下的 UWP 窗口
 	EnumWindows(
 		[](HWND hWnd, LPARAM lParam) {
-			if (IsCandidateWindow(hWnd)) {
-				((SmallVector<HWND>*)lParam)->push_back(hWnd);
-			}
+		if (IsCandidateWindow(hWnd)) {
+			((SmallVector<HWND>*)lParam)->push_back(hWnd);
+		}
 
-			return TRUE;
-		},
+		return TRUE;
+	},
 		(LPARAM)&windows
-	);
+		);
 
 	return windows;
 }
@@ -101,7 +101,10 @@ static void SortCandidateWindows(It begin, It end) {
 	});
 }
 
-void NewProfileViewModel::PrepareForOpen(uint32_t dpi, bool isLightTheme, CoreDispatcher const& dispatcher) {
+NewApplicationViewModel::NewApplicationViewModel(int profileIdx) : _profileIndex(profileIdx) {
+}
+
+void NewApplicationViewModel::PrepareForOpen(uint32_t dpi, bool isLightTheme, CoreDispatcher const& dispatcher) {
 	std::vector<CandidateWindowItem> candidateWindows;
 	for (HWND hWnd : GetDesktopWindows()) {
 		candidateWindows.emplace_back((uint64_t)hWnd, dpi, isLightTheme, dispatcher);
@@ -139,10 +142,10 @@ void NewProfileViewModel::PrepareForOpen(uint32_t dpi, bool isLightTheme, CoreDi
 	_profiles = single_threaded_vector(std::move(profiles));
 	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"Profiles"));
 
-	ProfileIndex(0);
+	CopyFromProfileIndex(0);
 }
 
-void NewProfileViewModel::CandidateWindowIndex(int value) {
+void NewApplicationViewModel::CandidateWindowIndex(int value) {
 	_candidateWindowIndex = value;
 	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"CandidateWindowIndex"));
 
@@ -153,22 +156,27 @@ void NewProfileViewModel::CandidateWindowIndex(int value) {
 	}
 }
 
-void NewProfileViewModel::Name(const hstring& value) noexcept {
+void NewApplicationViewModel::Name(const hstring& value) noexcept {
 	_name = value;
 	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"Name"));
 
 	_IsConfirmButtonEnabled(!value.empty() && _candidateWindowIndex >= 0);
 }
 
-void NewProfileViewModel::Confirm() const noexcept {
+void NewApplicationViewModel::Confirm() const noexcept {
 	if (_candidateWindowIndex < 0 || _name.empty()) {
 		return;
 	}
 
 	CandidateWindowItem selectedItem = _candidateWindows.GetAt(_candidateWindowIndex).as<CandidateWindowItem>();
 	hstring aumid = selectedItem.AUMID();
-	ProfileService::Get().AddProfile(!aumid.empty(), aumid.empty() ? selectedItem.Path() : aumid,
-		selectedItem.ClassName(), _name, _profileIndex - 1);
+	if (IsCreatingProfile()) {
+		ProfileService::Get().AddProfile(!aumid.empty(), aumid.empty() ? selectedItem.Path() : aumid,
+			selectedItem.ClassName(), _name, _copyFromProfileIndex - 1);
+	} else {
+		ProfileService::Get().AddApplication(_profileIndex, !aumid.empty(), aumid.empty() ? selectedItem.Path() : aumid,
+			selectedItem.ClassName());
+	}
 }
 
 }

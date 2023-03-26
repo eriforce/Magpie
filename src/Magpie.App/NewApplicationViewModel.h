@@ -1,10 +1,10 @@
 #pragma once
-#include "NewProfileViewModel.g.h"
+#include "NewApplicationViewModel.g.h"
 
 namespace winrt::Magpie::App::implementation {
 
-struct NewProfileViewModel : NewProfileViewModelT<NewProfileViewModel> {
-	NewProfileViewModel() = default;
+struct NewApplicationViewModel : NewApplicationViewModelT<NewApplicationViewModel> {
+	NewApplicationViewModel(int profileIdx);
 
 	event_token PropertyChanged(PropertyChangedEventHandler const& handler) {
 		return _propertyChangedEvent.add(handler);
@@ -36,13 +36,17 @@ struct NewProfileViewModel : NewProfileViewModelT<NewProfileViewModel> {
 		return _profiles;
 	}
 
-	int ProfileIndex() const noexcept {
-		return _profileIndex;
+	int CopyFromProfileIndex() const noexcept {
+		return _copyFromProfileIndex;
 	}
 
-	void ProfileIndex(int value) {
-		_profileIndex = value;
-		_propertyChangedEvent(*this, PropertyChangedEventArgs(L"ProfileIndex"));
+	void CopyFromProfileIndex(int value) {
+		_copyFromProfileIndex = value;
+		_propertyChangedEvent(*this, PropertyChangedEventArgs(L"CopyFromProfileIndex"));
+	}
+
+	bool IsCreatingProfile() const noexcept {
+		return _profileIndex < 0;
 	}
 
 	bool IsConfirmButtonEnabled() const noexcept {
@@ -75,7 +79,8 @@ private:
 	int _candidateWindowIndex = -1;
 	hstring _name;
 	IVector<IInspectable> _profiles{ nullptr };
-	int _profileIndex = 0;
+	int _profileIndex = -1;
+	int _copyFromProfileIndex = 0;
 	bool _isConfirmButtonEnabled = false;
 };
 
@@ -83,7 +88,7 @@ private:
 
 namespace winrt::Magpie::App::factory_implementation {
 
-struct NewProfileViewModel : NewProfileViewModelT<NewProfileViewModel, implementation::NewProfileViewModel> {
+struct NewApplicationViewModel : NewApplicationViewModelT<NewApplicationViewModel, implementation::NewApplicationViewModel> {
 };
 
 }

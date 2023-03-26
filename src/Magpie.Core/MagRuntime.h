@@ -24,6 +24,8 @@ public:
 
 	void Stop();
 
+	void Set3DGameMode(bool value) noexcept;
+
 	bool IsRunning() const {
 		return _running;
 	}

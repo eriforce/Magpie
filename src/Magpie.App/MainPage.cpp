@@ -30,7 +30,7 @@ namespace winrt::Magpie::App::implementation {
 
 static constexpr const uint32_t FIRST_PROFILE_ITEM_IDX = 4;
 
-MainPage::MainPage() {
+MainPage::MainPage() : _newApplicationViewModel(-1) {
 	_themeChangedRevoker = AppSettings::Get().ThemeChanged(auto_revoke, [this](Theme) { _UpdateTheme(); });
 	_colorValuesChangedRevoker = _uiSettings.ColorValuesChanged(
 		auto_revoke, { this, &MainPage::_UISettings_ColorValuesChanged });
@@ -78,7 +78,7 @@ void MainPage::InitializeComponent() {
 		item.Content(box_value(profile.name));
 		// 用于占位
 		item.Icon(FontIcon());
-		_LoadIcon(item, profile);
+		_LoadIcon(item, profile, false);
 
 		navMenuItems.InsertAt(navMenuItems.Size() - 1, item);
 	}
@@ -180,7 +180,7 @@ fire_and_forget MainPage::NavigationView_ItemInvoked(MUXC::NavigationView const&
 	if (args.InvokedItemContainer() == NewProfileNavigationViewItem()) {
 		const UINT dpi = (UINT)std::lroundf(_displayInformation.LogicalDpi());
 		const bool isLightTheme = ActualTheme() == ElementTheme::Light;
-		_newProfileViewModel.PrepareForOpen(dpi, isLightTheme, Dispatcher());
+		_newApplicationViewModel.PrepareForOpen(dpi, isLightTheme, Dispatcher());
 
 		// 同步调用 ShowAt 有时会失败
 		co_await Dispatcher().TryRunAsync(CoreDispatcherPriority::Normal, [this]() {
@@ -196,12 +196,12 @@ void MainPage::ComboBox_DropDownOpened(IInspectable const&, IInspectable const&)
 }
 
 void MainPage::NewProfileConfirmButton_Click(IInspectable const&, RoutedEventArgs const&) {
-	_newProfileViewModel.Confirm();
+	_newApplicationViewModel.Confirm();
 	NewProfileFlyout().Hide();
 }
 
 void MainPage::NewProfileNameTextBox_KeyDown(IInspectable const&, Input::KeyRoutedEventArgs const& args) {
-	if (args.Key() == VirtualKey::Enter && _newProfileViewModel.IsConfirmButtonEnabled()) {
+	if (args.Key() == VirtualKey::Enter && _newApplicationViewModel.IsConfirmButtonEnabled()) {
 		NewProfileConfirmButton_Click(nullptr, nullptr);
 	}
 }
@@ -253,36 +253,48 @@ void MainPage::_UpdateTheme(bool updateIcons) {
 	}
 }
 
-fire_and_forget MainPage::_LoadIcon(MUXC::NavigationViewItem const& item, const Profile& profile) {
+fire_and_forget MainPage::_LoadIcon(MUXC::NavigationViewItem const& item, const Profile& profile, bool skipDesktop) {
 	weak_ref<MUXC::NavigationViewItem> weakRef(item);
 
-	bool preferLightTheme = ActualTheme() == ElementTheme::Light;
-	bool isPackaged = profile.isPackaged;
-	std::wstring path = profile.pathRule;
-	CoreDispatcher dispatcher = Dispatcher();
-	uint32_t dpi = (uint32_t)std::lroundf(_displayInformation.LogicalDpi());
-
-	co_await resume_background();
-
+	static constexpr const UINT ICON_SIZE = 16;
 	std::wstring iconPath;
 	SoftwareBitmap iconBitmap{ nullptr };
 
-	if (isPackaged) {
+	if (profile.applications.size() > 0) {
+		bool preferLightTheme = ActualTheme() == ElementTheme::Light;
+		uint32_t dpi = (uint32_t)std::lroundf(_displayInformation.LogicalDpi());
+		CoreDispatcher dispatcher = Dispatcher();
+
+		co_await resume_background();
+
 		AppXReader reader;
-		if (reader.Initialize(path)) {
-			std::variant<std::wstring, SoftwareBitmap> uwpIcon =
-				reader.GetIcon((uint32_t)std::ceil(dpi * 16.0 / USER_DEFAULT_SCREEN_DPI), preferLightTheme);
-			if (uwpIcon.index() == 0) {
-				iconPath = std::get<0>(uwpIcon);
+		for (int i = 0; i < profile.applications.size(); i++) {
+			const ProfileApplication& application = profile.applications[i];
+
+			if (application.isPackaged) {
+				if (reader.Initialize(application.pathRule)) {
+					std::variant<std::wstring, SoftwareBitmap> uwpIcon =
+						reader.GetIcon((uint32_t)std::ceil(dpi * ICON_SIZE / USER_DEFAULT_SCREEN_DPI), preferLightTheme);
+					if (uwpIcon.index() == 0) {
+						iconPath = std::get<0>(uwpIcon);
+					} else {
+						iconBitmap = std::get<1>(uwpIcon);
+					}
+					break;
+				}
 			} else {
-				iconBitmap = std::get<1>(uwpIcon);
+				if (Win32Utils::FileExists(application.pathRule.c_str())) {
+					if (skipDesktop) {
+						co_return;
+					}
+					iconBitmap = IconHelper::ExtractIconFromExe(application.pathRule.c_str(), ICON_SIZE, dpi);
+					break;
+				}
 			}
 		}
-	} else {
-		iconBitmap = IconHelper::ExtractIconFromExe(path.c_str(), 16, dpi);
-	}
 
-	co_await dispatcher;
+		co_await dispatcher;
+	}
 
 	auto strongRef = weakRef.get();
 	if (!strongRef) {
@@ -293,8 +305,8 @@ fire_and_forget MainPage::_LoadIcon(MUXC::NavigationViewItem const& item, const 
 		BitmapIcon icon;
 		icon.ShowAsMonochrome(false);
 		icon.UriSource(Uri(iconPath));
-		icon.Width(16);
-		icon.Height(16);
+		icon.Width(ICON_SIZE);
+		icon.Height(ICON_SIZE);
 
 		strongRef.Icon(icon);
 	} else if (iconBitmap) {
@@ -302,8 +314,8 @@ fire_and_forget MainPage::_LoadIcon(MUXC::NavigationViewItem const& item, const 
 		co_await imageSource.SetBitmapAsync(iconBitmap);
 
 		MUXC::ImageIcon imageIcon;
-		imageIcon.Width(16);
-		imageIcon.Height(16);
+		imageIcon.Width(ICON_SIZE);
+		imageIcon.Height(ICON_SIZE);
 		imageIcon.Source(imageSource);
 
 		strongRef.Icon(imageIcon);
@@ -334,12 +346,8 @@ void MainPage::_UpdateIcons(bool skipDesktop) {
 	const std::vector<Profile>& profiles = AppSettings::Get().Profiles();
 
 	for (uint32_t i = 0; i < profiles.size(); ++i) {
-		if (skipDesktop && !profiles[i].isPackaged) {
-			continue;
-		}
-
 		MUXC::NavigationViewItem item = navMenuItems.GetAt(FIRST_PROFILE_ITEM_IDX + i).as<MUXC::NavigationViewItem>();
-		_LoadIcon(item, profiles[i]);
+		_LoadIcon(item, profiles[i], skipDesktop);
 	}
 }
 
@@ -348,7 +356,7 @@ void MainPage::_ProfileService_ProfileAdded(Profile& profile) {
 	item.Content(box_value(profile.name));
 	// 用于占位
 	item.Icon(FontIcon());
-	_LoadIcon(item, profile);
+	_LoadIcon(item, profile, false);
 
 	IVector<IInspectable> navMenuItems = __super::RootNavigationView().MenuItems();
 	navMenuItems.InsertAt(navMenuItems.Size() - 1, item);
@@ -374,7 +382,7 @@ void MainPage::_ProfileService_ProfileReordered(uint32_t profileIdx, bool isMove
 
 	uint32_t curIdx = FIRST_PROFILE_ITEM_IDX + profileIdx;
 	uint32_t otherIdx = isMoveUp ? curIdx - 1 : curIdx + 1;
-	
+
 	IInspectable otherItem = menuItems.GetAt(otherIdx);
 	menuItems.RemoveAt(otherIdx);
 	menuItems.InsertAt(curIdx, otherItem);

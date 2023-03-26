@@ -26,8 +26,8 @@ struct MainPage : MainPageT<MainPage> {
 
 	fire_and_forget NavigationView_ItemInvoked(MUXC::NavigationView const&, MUXC::NavigationViewItemInvokedEventArgs const& args);
 
-	Magpie::App::NewProfileViewModel NewProfileViewModel() const noexcept {
-		return _newProfileViewModel;
+	Magpie::App::NewApplicationViewModel NewApplicationViewModel() const noexcept {
+		return _newApplicationViewModel;
 	}
 
 	void ComboBox_DropDownOpened(IInspectable const&, IInspectable const&);
@@ -41,7 +41,7 @@ struct MainPage : MainPageT<MainPage> {
 private:
 	void _UpdateTheme(bool updateIcons = true);
 
-	fire_and_forget _LoadIcon(MUXC::NavigationViewItem const& item, const Profile& profile);
+	fire_and_forget _LoadIcon(MUXC::NavigationViewItem const& item, const Profile& profile, bool skipDesktop);
 
 	fire_and_forget _UISettings_ColorValuesChanged(Windows::UI::ViewManagement::UISettings const&, IInspectable const&);
 
@@ -60,7 +60,7 @@ private:
 	Windows::UI::ViewManagement::UISettings _uiSettings;
 	Windows::UI::ViewManagement::UISettings::ColorValuesChanged_revoker _colorValuesChangedRevoker;
 
-	Magpie::App::NewProfileViewModel _newProfileViewModel;
+	Magpie::App::NewApplicationViewModel _newApplicationViewModel;
 	WinRTUtils::EventRevoker _profileAddedRevoker;
 	WinRTUtils::EventRevoker _profileRenamedRevoker;
 	WinRTUtils::EventRevoker _profileRemovedRevoker;

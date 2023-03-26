@@ -483,6 +483,24 @@
   <data name="ScalingConfiguration_ScalingModes_ScaleFlyout_Type_Fit_Description" xml:space="preserve">
     <value>Выставить множитель увеличения после заполнения экрана пропорциональным увеличением</value>
   </data>
+  <data name="Profile_AddApplication.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
+    <value>Add application</value>
+  </data>
+  <data name="Profile_AddApplicationFlyout_Title.Text" xml:space="preserve">
+    <value>Add application</value>
+  </data>
+  <data name="Profile_AddApplicationFlyout_Add.Content" xml:space="preserve">
+    <value>Add</value>
+  </data>
+  <data name="Profile_Applications.Title" xml:space="preserve">
+    <value>Applications</value>
+  </data>
+  <data name="Profile_Applications_Launch.Text" xml:space="preserve">
+    <value>Запуск</value>
+  </data>
+  <data name="Profile_Applications_MoreOptionsFlyout_Delete.Text" xml:space="preserve">
+    <value>Удалить</value>
+  </data>
   <data name="Profile_General.Title" xml:space="preserve">
     <value>Общие</value>
   </data>
@@ -509,9 +527,6 @@
   </data>
   <data name="Profile_General_ScalingMode.Title" xml:space="preserve">
     <value>Режим увеличения</value>
-  </data>
-  <data name="Profile_Launch.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
-    <value>Запуск</value>
   </data>
   <data name="Profile_MoreOptions.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
     <value>Больше настроек</value>

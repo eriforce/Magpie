@@ -60,6 +60,12 @@ void MagRuntime::Stop() {
 	});
 }
 
+void MagRuntime::Set3DGameMode(bool value) noexcept {
+	MagOptions& options = MagApp::Get().GetOptions();
+	options.Is3DGameMode(value);
+	MagApp::Get().SetOptions(options);
+}
+
 void MagRuntime::_MagWindThreadProc() noexcept {
 	winrt::init_apartment(winrt::apartment_type::single_threaded);
 

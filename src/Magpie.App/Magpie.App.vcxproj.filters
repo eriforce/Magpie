@@ -55,6 +55,9 @@
     <ClCompile Include="LocalizationService.cpp">
       <Filter>Services</Filter>
     </ClCompile>
+    <ClCompile Include="ProfileApplication.cpp">
+      <Filter>Models</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -113,6 +116,9 @@
     <ClInclude Include="app.base.h" />
     <ClInclude Include="LocalizationService.h">
       <Filter>Services</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileApplication.h">
+      <Filter>Models</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -173,7 +179,10 @@
     <None Include="CandidateWindowItem.idl">
       <Filter>ViewModels</Filter>
     </None>
-    <None Include="NewProfileViewModel.idl">
+    <None Include="NewApplicationViewModel.idl">
+      <Filter>ViewModels</Filter>
+    </None>
+    <None Include="ProfileApplicationItem.idl">
       <Filter>ViewModels</Filter>
     </None>
     <None Include="ScalingConfigurationViewModel.idl">

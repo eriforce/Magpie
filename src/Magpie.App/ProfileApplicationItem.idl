@@ -1,0 +1,15 @@
+namespace Magpie.App {
+	runtimeclass ProfileApplicationItem : Windows.UI.Xaml.Data.INotifyPropertyChanged {
+		ProfileApplicationItem(UInt32 profileIdx, UInt32 applicationIdx);
+
+		void Launch();
+		void OpenProgramLocation();
+		void Remove();
+
+		void ApplicationIdx(UInt32 value);
+
+		String Path{ get; };
+		Boolean Exists{ get; };
+		Windows.UI.Xaml.Controls.IconElement Icon{ get; };
+	}
+}

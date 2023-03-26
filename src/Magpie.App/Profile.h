@@ -1,5 +1,6 @@
 #pragma once
 #include <Magpie.Core.h>
+#include "ProfileApplication.h"
 
 namespace winrt::Magpie::App {
 
@@ -27,7 +28,6 @@ struct Profile {
 		graphicsCard = other.graphicsCard;
 		multiMonitorUsage = other.multiMonitorUsage;
 		cursorInterpolationMode = other.cursorInterpolationMode;
-		launchParameters = other.launchParameters;
 		flags = other.flags;
 	}
 
@@ -43,9 +43,7 @@ struct Profile {
 
 	std::wstring name;
 
-	// 若为打包应用，PathRule 存储 AUMID
-	std::wstring pathRule;
-	std::wstring classNameRule;
+	std::vector<ProfileApplication> applications;
 
 	CursorScaling cursorScaling = CursorScaling::NoScaling;
 	float customCursorScaling = 1.0;
@@ -59,13 +57,10 @@ struct Profile {
 	::Magpie::Core::MultiMonitorUsage multiMonitorUsage = ::Magpie::Core::MultiMonitorUsage::Closest;
 	::Magpie::Core::CursorInterpolationMode cursorInterpolationMode = ::Magpie::Core::CursorInterpolationMode::NearestNeighbor;
 
-	std::wstring launchParameters;
-
-	uint32_t flags = ::Magpie::Core::MagFlags::VSync 
+	uint32_t flags = ::Magpie::Core::MagFlags::VSync
 		| ::Magpie::Core::MagFlags::AdjustCursorSpeed
 		| ::Magpie::Core::MagFlags::DrawCursor;
 
-	bool isPackaged = false;
 	bool isCroppingEnabled = false;
 	bool isAutoScale = false;
 };

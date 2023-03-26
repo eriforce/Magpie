@@ -105,6 +105,21 @@ public:
 		return _magRuntime->IsRunning();
 	}
 
+	event_token Is3DGameModeChanged(delegate<bool> const& handler) {
+		return _is3DGameModeChangedEvent.add(handler);
+	}
+
+	WinRTUtils::EventRevoker Is3DGameModeChanged(auto_revoke_t, delegate<bool> const& handler) {
+		event_token token = Is3DGameModeChanged(handler);
+		return WinRTUtils::EventRevoker([this, token]() {
+			Is3DGameModeChanged(token);
+		});
+	}
+
+	void Is3DGameModeChanged(event_token const& token) {
+		_is3DGameModeChangedEvent.remove(token);
+	}
+
 	// 强制重新检查前台窗口
 	void CheckForeground();
 
@@ -151,7 +166,8 @@ private:
 	event<delegate<double>> _timerTickEvent;
 	event<delegate<HWND>> _wndToRestoreChangedEvent;
 	event<delegate<bool>> _isRunningChangedEvent;
-	
+	event<delegate<bool>> _is3DGameModeChangedEvent;
+
 	bool _isAutoScaling = false;
 };
 

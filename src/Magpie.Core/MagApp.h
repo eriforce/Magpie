@@ -61,6 +61,10 @@ public:
 		return _options;
 	}
 
+	void SetOptions(const MagOptions& options) noexcept {
+		_options = options;
+	}
+
 	winrt::DispatcherQueue Dispatcher() const noexcept {
 		return _dispatcher;
 	}

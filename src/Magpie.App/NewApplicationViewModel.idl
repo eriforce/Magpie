@@ -1,6 +1,6 @@
 namespace Magpie.App {
-	runtimeclass NewProfileViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged {
-		NewProfileViewModel();
+	runtimeclass NewApplicationViewModel : Windows.UI.Xaml.Data.INotifyPropertyChanged {
+		NewApplicationViewModel(Int32 profileIdx);
 
 		void PrepareForOpen(UInt32 dpi, Boolean isLightTheme, Windows.UI.Core.CoreDispatcher dispatcher);
 
@@ -8,7 +8,8 @@ namespace Magpie.App {
 		Int32 CandidateWindowIndex;
 		String Name;
 		IVector<IInspectable> Profiles { get; };
-		Int32 ProfileIndex;
+		Int32 CopyFromProfileIndex;
+		Boolean IsCreatingProfile { get; };
 		Boolean IsConfirmButtonEnabled { get; };
 		Boolean IsNoCandidateWindow { get; };
 		Boolean IsAnyCandidateWindow { get; };

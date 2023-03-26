@@ -144,14 +144,19 @@
       <DependentUpon>KeyVisualState.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClInclude>
+    <ClInclude Include="ProfileApplication.h" />
+    <ClInclude Include="ProfileApplicationItem.h">
+      <DependentUpon>ProfileApplicationItem.idl</DependentUpon>
+      <SubType>Code</SubType>
+    </ClInclude>
     <ClInclude Include="ShortcutService.h" />
     <ClInclude Include="Shortcut.h" />
     <ClInclude Include="IconHelper.h" />
     <ClInclude Include="JsonHelper.h" />
     <ClInclude Include="LocalizationService.h" />
     <ClInclude Include="MagService.h" />
-    <ClInclude Include="NewProfileViewModel.h">
-      <DependentUpon>NewProfileViewModel.idl</DependentUpon>
+    <ClInclude Include="NewApplicationViewModel.h">
+      <DependentUpon>NewApplicationViewModel.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClInclude>
     <ClInclude Include="ScalingModeEffectItem.h">
@@ -289,14 +294,19 @@
       <DependentUpon>KeyVisualState.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
+    <ClCompile Include="ProfileApplication.cpp" />
+    <ClCompile Include="ProfileApplicationItem.cpp">
+      <DependentUpon>ProfileApplicationItem.idl</DependentUpon>
+      <SubType>Code</SubType>
+    </ClCompile>
     <ClCompile Include="ShortcutService.cpp" />
     <ClCompile Include="Shortcut.cpp" />
     <ClCompile Include="IconHelper.cpp" />
     <ClCompile Include="JsonHelper.cpp" />
     <ClCompile Include="LocalizationService.cpp" />
     <ClCompile Include="MagService.cpp" />
-    <ClCompile Include="NewProfileViewModel.cpp">
-      <DependentUpon>NewProfileViewModel.idl</DependentUpon>
+    <ClCompile Include="NewApplicationViewModel.cpp">
+      <DependentUpon>NewApplicationViewModel.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
     <ClCompile Include="ScalingModeEffectItem.cpp">
@@ -388,6 +398,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="ProfileApplicationItem.idl">
+      <SubType>Designer</SubType>
+    </None>
     <None Include="KeyVisualState.idl">
       <SubType>Designer</SubType>
     </None>
@@ -446,7 +459,7 @@
     <None Include="CandidateWindowItem.idl">
       <SubType>Designer</SubType>
     </None>
-    <None Include="NewProfileViewModel.idl">
+    <None Include="NewApplicationViewModel.idl">
       <SubType>Designer</SubType>
     </None>
     <None Include="BoolToNegativeVisibilityConverter.idl">

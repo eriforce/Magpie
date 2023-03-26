@@ -17,7 +17,7 @@ namespace winrt::Magpie::App {
 
 void MagService::Initialize() {
 	_dispatcher = CoreWindow::GetForCurrentThread().Dispatcher();
-	
+
 	_countDownTimer.Interval(25ms);
 	_countDownTimer.Tick({ this, &MagService::_CountDownTimer_Tick });
 
@@ -25,7 +25,7 @@ void MagService::Initialize() {
 		{ this, &MagService::_CheckForegroundTimer_Tick },
 		50ms
 	);
-	
+
 	AppSettings::Get().IsAutoRestoreChanged({ this, &MagService::_Settings_IsAutoRestoreChanged });
 	_magRuntime.emplace();
 	_magRuntime->IsRunningChanged({ this, &MagService::_MagRuntime_IsRunningChanged });
@@ -120,6 +120,18 @@ void MagService::_ShortcutService_ShortcutPressed(ShortcutAction action) {
 		}
 		break;
 	}
+	case ShortcutAction::Is3DGameMode:
+	{
+		if (_magRuntime->IsRunning()) {
+			Profile& profile = ProfileService::Get().GetProfileForWindow(_magRuntime->HwndSrc());
+			bool is3DGameMode = !profile.Is3DGameMode();
+			_magRuntime->Set3DGameMode(is3DGameMode);
+			profile.Is3DGameMode(is3DGameMode);
+			_is3DGameModeChangedEvent(is3DGameMode);
+			return;
+		}
+		break;
+	}
 	default:
 		break;
 	}
@@ -153,7 +165,7 @@ fire_and_forget MagService::_CheckForegroundTimer_Tick(ThreadPoolTimer const& ti
 		// ThreadPoolTimer 在后台线程触发
 		co_await _dispatcher;
 	}
-	
+
 	const bool isAutoRestore = AppSettings::Get().IsAutoRestore();
 
 	if (_CheckSrcWnd(hwndFore)) {
@@ -255,7 +267,7 @@ bool MagService::_StartScale(HWND hWnd, const Profile& profile) {
 			}
 		}
 	}
-	
+
 	options.graphicsCard = profile.graphicsCard;
 	options.captureMethod = profile.captureMethod;
 	options.multiMonitorUsage = profile.multiMonitorUsage;

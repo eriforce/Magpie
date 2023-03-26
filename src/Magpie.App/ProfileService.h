@@ -4,6 +4,7 @@
 namespace winrt::Magpie::App {
 
 struct Profile;
+struct ProfileApplication;
 
 class ProfileService {
 public:
@@ -86,6 +87,42 @@ public:
 		_profileReorderedEvent.remove(token);
 	}
 
+	bool AddApplication(uint32_t profileIdx, bool isPackaged, std::wstring_view pathOrAumid, std::wstring_view className);
+
+	event_token ApplicationAdded(delegate<uint32_t, uint32_t> const& handler) {
+		return _applicationAddedEvent.add(handler);
+	}
+
+	WinRTUtils::EventRevoker ApplicationAdded(auto_revoke_t, delegate<uint32_t, uint32_t> const& handler) {
+		event_token token = ApplicationAdded(handler);
+		return WinRTUtils::EventRevoker([this, token]() {
+			ApplicationAdded(token);
+		});
+	}
+
+	void ApplicationAdded(event_token const& token) {
+		_applicationAddedEvent.remove(token);
+	}
+
+	void RemoveApplication(uint32_t profileIdx, uint32_t applicationIdx);
+
+	event_token ApplicationRemoved(delegate<uint32_t, uint32_t> const& handler) {
+		return _applicationRemovedEvent.add(handler);
+	}
+
+	WinRTUtils::EventRevoker ApplicationRemoved(auto_revoke_t, delegate<uint32_t, uint32_t> const& handler) {
+		event_token token = ApplicationRemoved(handler);
+		return WinRTUtils::EventRevoker([this, token]() {
+			ApplicationRemoved(token);
+		});
+	}
+
+	void ApplicationRemoved(event_token const& token) {
+		_applicationRemovedEvent.remove(token);
+	}
+
+	void MoveApplication(uint32_t profileIdx, uint32_t fromIdx, uint32_t toIdx);
+
 	Profile& GetProfileForWindow(HWND hWnd);
 
 	Profile& DefaultProfile();
@@ -101,6 +138,8 @@ private:
 	event<delegate<uint32_t>> _profileRenamedEvent;
 	event<delegate<uint32_t>> _profileRemovedEvent;
 	event<delegate<uint32_t, bool>> _profileReorderedEvent;
+	event<delegate<uint32_t, uint32_t>> _applicationAddedEvent;
+	event<delegate<uint32_t, uint32_t>> _applicationRemovedEvent;
 };
 
 }
