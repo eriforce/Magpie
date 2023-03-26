@@ -62,12 +62,19 @@ static void WriteProfile(rapidjson::PrettyWriter<rapidjson::StringBuffer>& write
 	if (!profile.name.empty()) {
 		writer.Key("name");
 		writer.String(StrUtils::UTF16ToUTF8(profile.name).c_str());
-		writer.Key("packaged");
-		writer.Bool(profile.isPackaged);
-		writer.Key("pathRule");
-		writer.String(StrUtils::UTF16ToUTF8(profile.pathRule).c_str());
-		writer.Key("classNameRule");
-		writer.String(StrUtils::UTF16ToUTF8(profile.classNameRule).c_str());
+		writer.Key("applications");
+		writer.StartArray();
+		for (const ProfileApplication& application : profile.applications) {
+			writer.StartObject();
+			writer.Key("packaged");
+			writer.Bool(application.isPackaged);
+			writer.Key("pathRule");
+			writer.String(StrUtils::UTF16ToUTF8(application.pathRule).c_str());
+			writer.Key("classNameRule");
+			writer.String(StrUtils::UTF16ToUTF8(application.classNameRule).c_str());
+			writer.EndObject();
+		}
+		writer.EndArray();
 		writer.Key("autoScale");
 		writer.Bool(profile.isAutoScale);
 	}
@@ -166,7 +173,7 @@ static void ShowErrorMessage(const wchar_t* mainInstruction, const wchar_t* cont
 	tdc.pszContent = content;
 	tdc.pfCallback = TaskDialogCallback;
 	tdc.cButtons = 1;
-	TASKDIALOG_BUTTON button{ IDCANCEL, exitStr.c_str()};
+	TASKDIALOG_BUTTON button{ IDCANCEL, exitStr.c_str() };
 	tdc.pButtons = &button;
 
 	TaskDialogIndirect(&tdc, nullptr, nullptr, nullptr);
@@ -219,7 +226,7 @@ bool AppSettings::Initialize() {
 	}
 
 	// 此时 ResourceLoader 使用“首选语言”
-	
+
 	std::string configText;
 	if (!Win32Utils::ReadTextFile(_configPath.c_str(), configText)) {
 		logger.Error("读取配置文件失败");
@@ -610,7 +617,7 @@ void AppSettings::_LoadSettings(const rapidjson::GenericObject<true, rapidjson::
 	auto shortcutsNode = root.FindMember("shortcuts");
 	if (shortcutsNode == root.MemberEnd()) {
 		// v0.10.0-preview1 使用 hotkeys
-		shortcutsNode= root.FindMember("hotkeys");
+		shortcutsNode = root.FindMember("hotkeys");
 	}
 	if (shortcutsNode != root.MemberEnd() && shortcutsNode->value.IsObject()) {
 		const auto& shortcutsObj = shortcutsNode->value.GetObj();
@@ -731,18 +738,32 @@ bool AppSettings::_LoadProfile(
 			}
 		}
 
-		if (!JsonHelper::ReadBool(profileObj, "packaged", profile.isPackaged, true)) {
-			return false;
-		}
+		auto applicationsNode = profileObj.FindMember("applications");
+		if (applicationsNode != profileObj.MemberEnd() && applicationsNode->value.IsArray()) {
+			const auto& applicationsArray = applicationsNode->value.GetArray();
 
-		if (!JsonHelper::ReadString(profileObj, "pathRule", profile.pathRule, true)
-			|| profile.pathRule.empty()) {
-			return false;
-		}
+			const rapidjson::SizeType size = applicationsArray.Size();
+			if (size > 0) {
+				profile.applications.reserve((size_t)size);
+				for (rapidjson::SizeType i = 0; i < size; ++i) {
+					if (!applicationsArray[i].IsObject()) {
+						continue;
+					}
 
-		if (!JsonHelper::ReadString(profileObj, "classNameRule", profile.classNameRule, true)
-			|| profile.classNameRule.empty()) {
-			return false;
+					ProfileApplication& application = profile.applications.emplace_back();
+					if (!_LoadProfileApplication(applicationsArray[i].GetObj(), application)) {
+						profile.applications.pop_back();
+						continue;
+					}
+				}
+			}
+		} else {
+			// v0.10.0 的程序配置直接在Profile下
+			ProfileApplication& application = profile.applications.emplace_back();
+
+			if (!_LoadProfileApplication(profileObj, application)) {
+				return false;
+			}
 		}
 
 		JsonHelper::ReadBool(profileObj, "autoScale", profile.isAutoScale);
@@ -759,7 +780,7 @@ bool AppSettings::_LoadProfile(
 			// v0.10.0-preview1 使用 captureMode
 			JsonHelper::ReadUInt(profileObj, "captureMode", captureMethod);
 		}
-		
+
 		if (captureMethod > 3) {
 			captureMethod = (uint32_t)CaptureMethod::GraphicsCapture;
 		} else if (captureMethod == (uint32_t)CaptureMethod::DesktopDuplication) {
@@ -779,7 +800,7 @@ bool AppSettings::_LoadProfile(
 		}
 		profile.multiMonitorUsage = (MultiMonitorUsage)multiMonitorUsage;
 	}
-	
+
 	if (!JsonHelper::ReadInt(profileObj, "graphicsCard", profile.graphicsCard, true)) {
 		// v0.10.0-preview1 使用 graphicsAdapter
 		uint32_t graphicsAdater = 0;
@@ -808,7 +829,7 @@ bool AppSettings::_LoadProfile(
 		}
 		profile.cursorScaling = (CursorScaling)cursorScaling;
 	}
-	
+
 	JsonHelper::ReadFloat(profileObj, "customCursorScaling", profile.customCursorScaling);
 	if (profile.customCursorScaling < 0) {
 		profile.customCursorScaling = 1.0f;
@@ -840,6 +861,27 @@ bool AppSettings::_LoadProfile(
 		) {
 			profile.cropping = {};
 		}
+	}
+
+	return true;
+}
+
+bool AppSettings::_LoadProfileApplication(
+	const rapidjson::GenericObject<true, rapidjson::Value>& applicationObj,
+	ProfileApplication& application
+) {
+	if (!JsonHelper::ReadBool(applicationObj, "packaged", application.isPackaged, true)) {
+		return false;
+	}
+
+	if (!JsonHelper::ReadString(applicationObj, "pathRule", application.pathRule, true)
+		|| application.pathRule.empty()) {
+		return false;
+	}
+
+	if (!JsonHelper::ReadString(applicationObj, "classNameRule", application.classNameRule, true)
+		|| application.classNameRule.empty()) {
+		return false;
 	}
 
 	return true;

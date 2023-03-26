@@ -257,33 +257,36 @@ void MainPage::_UpdateTheme(bool updateIcons) {
 fire_and_forget MainPage::_LoadIcon(MUXC::NavigationViewItem const& item, const Profile& profile) {
 	weak_ref<MUXC::NavigationViewItem> weakRef(item);
 
-	bool preferLightTheme = ActualTheme() == ElementTheme::Light;
-	bool isPackaged = profile.isPackaged;
-	std::wstring path = profile.pathRule;
-	CoreDispatcher dispatcher = Dispatcher();
-	uint32_t dpi = (uint32_t)std::lroundf(_displayInformation.LogicalDpi());
-
-	co_await resume_background();
-
 	std::wstring iconPath;
 	SoftwareBitmap iconBitmap{ nullptr };
 
-	if (isPackaged) {
-		AppXReader reader;
-		if (reader.Initialize(path)) {
-			std::variant<std::wstring, SoftwareBitmap> uwpIcon =
-				reader.GetIcon((uint32_t)std::ceil(dpi * 16.0 / USER_DEFAULT_SCREEN_DPI), preferLightTheme);
-			if (uwpIcon.index() == 0) {
-				iconPath = std::get<0>(uwpIcon);
-			} else {
-				iconBitmap = std::get<1>(uwpIcon);
-			}
-		}
-	} else {
-		iconBitmap = IconHelper::ExtractIconFromExe(path.c_str(), 16, dpi);
-	}
+	if (profile.applications.size() > 0) {
+		ProfileApplication application = profile.applications[0];
+		bool isPackaged = application.isPackaged;
+		std::wstring path = application.pathRule;
+		CoreDispatcher dispatcher = Dispatcher();
+		uint32_t dpi = (uint32_t)std::lroundf(_displayInformation.LogicalDpi());
 
-	co_await dispatcher;
+		co_await resume_background();
+
+		if (isPackaged) {
+			AppXReader reader;
+			if (reader.Initialize(path)) {
+				bool preferLightTheme = ActualTheme() == ElementTheme::Light;
+				std::variant<std::wstring, SoftwareBitmap> uwpIcon =
+					reader.GetIcon((uint32_t)std::ceil(dpi * 16.0 / USER_DEFAULT_SCREEN_DPI), preferLightTheme);
+				if (uwpIcon.index() == 0) {
+					iconPath = std::get<0>(uwpIcon);
+				} else {
+					iconBitmap = std::get<1>(uwpIcon);
+				}
+			}
+		} else {
+			iconBitmap = IconHelper::ExtractIconFromExe(path.c_str(), 16, dpi);
+		}
+
+		co_await dispatcher;
+	}
 
 	auto strongRef = weakRef.get();
 	if (!strongRef) {
@@ -335,7 +338,7 @@ void MainPage::_UpdateIcons(bool skipDesktop) {
 	const std::vector<Profile>& profiles = AppSettings::Get().Profiles();
 
 	for (uint32_t i = 0; i < profiles.size(); ++i) {
-		if (skipDesktop && !profiles[i].isPackaged) {
+		if (profiles[i].applications.size() == 0 || (skipDesktop && !profiles[i].applications[0].isPackaged)) {
 			continue;
 		}
 
@@ -375,7 +378,7 @@ void MainPage::_ProfileService_ProfileReordered(uint32_t profileIdx, bool isMove
 
 	uint32_t curIdx = FIRST_PROFILE_ITEM_IDX + profileIdx;
 	uint32_t otherIdx = isMoveUp ? curIdx - 1 : curIdx + 1;
-	
+
 	IInspectable otherItem = menuItems.GetAt(otherIdx);
 	menuItems.RemoveAt(otherIdx);
 	menuItems.InsertAt(curIdx, otherItem);

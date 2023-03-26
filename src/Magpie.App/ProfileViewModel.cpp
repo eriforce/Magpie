@@ -83,11 +83,18 @@ ProfileViewModel::ProfileViewModel(int profileIdx) : _isDefaultProfile(profileId
 			}
 		);
 
-		if (_data->isPackaged) {
-			AppXReader appxReader;
-			_isProgramExist = appxReader.Initialize(_data->pathRule);
-		} else {
-			_isProgramExist = Win32Utils::FileExists(_data->pathRule.c_str());
+		bool isProgramExist;
+		for (ProfileApplication& application : _data->applications) {
+			if (application.isPackaged) {
+				AppXReader appxReader;
+				isProgramExist = appxReader.Initialize(application.pathRule);
+			} else {
+				isProgramExist = Win32Utils::FileExists(application.pathRule.c_str());
+			}
+			if (isProgramExist) {
+				_existingApplication = &application;
+				break;
+			}
 		}
 
 		_LoadIcon(mainPage);
@@ -130,14 +137,14 @@ bool ProfileViewModel::IsNotDefaultProfile() const noexcept {
 }
 
 fire_and_forget ProfileViewModel::OpenProgramLocation() const noexcept {
-	if (!_isProgramExist) {
+	if (_existingApplication == nullptr) {
 		co_return;
 	}
 
 	std::wstring programLocation;
-	if (_data->isPackaged) {
+	if (_existingApplication->isPackaged) {
 		AppXReader appxReader;
-		[[maybe_unused]] bool result = appxReader.Initialize(_data->pathRule);
+		[[maybe_unused]] bool result = appxReader.Initialize(_existingApplication->pathRule);
 		assert(result);
 
 		programLocation = appxReader.GetExecutablePath();
@@ -147,7 +154,7 @@ fire_and_forget ProfileViewModel::OpenProgramLocation() const noexcept {
 			co_return;
 		}
 	} else {
-		programLocation = _data->pathRule;
+		programLocation = _existingApplication->pathRule;
 	}
 
 	co_await resume_background();
@@ -189,14 +196,14 @@ static void LaunchPackagedApp(const wchar_t* aumid) {
 }
 
 void ProfileViewModel::Launch() const noexcept {
-	if (!_isProgramExist) {
+	if (_existingApplication == nullptr) {
 		return;
 	}
 
-	if (_data->isPackaged) {
-		LaunchPackagedApp(_data->pathRule.c_str());
+	if (_existingApplication->isPackaged) {
+		LaunchPackagedApp(_existingApplication->pathRule.c_str());
 	} else {
-		Win32Utils::ShellOpen(_data->pathRule.c_str());
+		Win32Utils::ShellOpen(_existingApplication->pathRule.c_str());
 	}
 }
 
@@ -671,12 +678,12 @@ fire_and_forget ProfileViewModel::_LoadIcon(FrameworkElement const& mainPage) {
 	std::wstring iconPath;
 	SoftwareBitmap iconBitmap{ nullptr };
 
-	if (_isProgramExist) {
+	if (_existingApplication != nullptr) {
 		auto weakThis = get_weak();
 
 		const bool preferLightTheme = mainPage.ActualTheme() == ElementTheme::Light;
-		const bool isPackaged = _data->isPackaged;
-		const std::wstring path = _data->pathRule;
+		const bool isPackaged = _existingApplication->isPackaged;
+		const std::wstring path = _existingApplication->pathRule;
 		CoreDispatcher dispatcher = mainPage.Dispatcher();
 		const uint32_t dpi = (uint32_t)std::lroundf(_displayInformation.LogicalDpi());
 
