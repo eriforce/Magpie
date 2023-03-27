@@ -512,6 +512,46 @@ bool Win32Utils::IsProcessElevated() noexcept {
 	return bool(result == 1);
 }
 
+bool Win32Utils::SetDebugPrivilege() noexcept {
+	HANDLE hToken;
+	TOKEN_PRIVILEGES tp;
+	LUID luid;
+
+	if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken) != 0) {
+		if (!LookupPrivilegeValue(
+			NULL, // lookup privilege on local system
+			SE_DEBUG_NAME, // privilege to lookup
+			&luid)) // receives LUID of privilege
+		{
+			CloseHandle(hToken);
+			return false;
+		}
+		tp.PrivilegeCount = 1;
+		tp.Privileges[0].Luid = luid;
+		tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+		if (!AdjustTokenPrivileges(
+			hToken,
+			FALSE,
+			&tp,
+			sizeof(TOKEN_PRIVILEGES),
+			(PTOKEN_PRIVILEGES)NULL,
+			(PDWORD)NULL)) {
+			CloseHandle(hToken);
+			return false;
+		}
+
+		if (GetLastError() == ERROR_NOT_ALL_ASSIGNED) {
+			CloseHandle(hToken);
+			return false;
+		}
+
+		CloseHandle(hToken);
+		return true;
+	}
+	return false;
+}
+
 static winrt::com_ptr<IShellView> FindDesktopFolderView() {
 	winrt::com_ptr<IShellWindows> shellWindows =
 		winrt::try_create_instance<IShellWindows>(CLSID_ShellWindows, CLSCTX_LOCAL_SERVER);
@@ -530,7 +570,7 @@ static winrt::com_ptr<IShellView> FindDesktopFolderView() {
 		Logger::Get().ComError("IShellWindows::FindWindowSW 失败", hr);
 		return nullptr;
 	}
-	
+
 	winrt::com_ptr<IShellBrowser> shellBrowser;
 	hr = dispatch.as<IServiceProvider>()->QueryService(
 		SID_STopLevelBrowser, IID_PPV_ARGS(&shellBrowser));
@@ -590,7 +630,7 @@ static bool OpenNonElevated(std::wstring_view path) {
 
 		return dispatch.try_as<IShellDispatch2>();
 	})();
-	
+
 	if (!shellDispatch) {
 		return false;
 	}
@@ -623,7 +663,7 @@ bool Win32Utils::ShellOpen(const wchar_t* path, bool nonElevated) {
 
 	// 指定工作目录为程序所在目录，否则某些程序不能正常运行
 	std::wstring workingDir(ExtractDirectory(path));
-	
+
 	SHELLEXECUTEINFO execInfo{};
 	execInfo.cbSize = sizeof(execInfo);
 	execInfo.lpFile = path;

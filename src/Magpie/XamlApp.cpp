@@ -73,6 +73,10 @@ bool XamlApp::Initialize(HINSTANCE hInstance, const wchar_t* arguments) {
 		}
 	}
 
+	if (Win32Utils::IsProcessElevated()) {
+		Win32Utils::SetDebugPrivilege();
+	}
+
 	return true;
 }
 

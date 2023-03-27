@@ -7,7 +7,7 @@ struct Win32Utils {
 	}
 
 	static bool CheckOverlap(const RECT& r1, const RECT& r2) noexcept {
-		return r1.right > r2.left && r1.bottom > r2.top && r1.left < r2.right&& r1.top < r2.bottom;
+		return r1.right > r2.left && r1.bottom > r2.top && r1.left < r2.right && r1.top < r2.bottom;
 	}
 
 	static std::wstring GetWndClassName(HWND hWnd);
@@ -46,7 +46,8 @@ struct Win32Utils {
 	struct OSVersion : Version {
 		constexpr OSVersion() {}
 		constexpr OSVersion(uint32_t major, uint32_t minor, uint32_t patch)
-			: Version(major, minor, patch) {}
+			: Version(major, minor, patch) {
+		}
 
 		bool Is20H1OrNewer() const noexcept {
 			return *this >= Version(10, 0, 19041);
@@ -111,7 +112,7 @@ struct Win32Utils {
 		}
 
 		_Requires_lock_held_(_srwLock)
-		void unlock() noexcept {
+			void unlock() noexcept {
 			unlock_exclusive();
 		}
 
@@ -120,7 +121,7 @@ struct Win32Utils {
 		}
 
 		_Requires_lock_held_(_srwLock)
-		void unlock_exclusive() noexcept {
+			void unlock_exclusive() noexcept {
 			ReleaseSRWLockExclusive(&_srwLock);
 		}
 
@@ -156,6 +157,8 @@ struct Win32Utils {
 	static const std::wstring& GetKeyName(uint8_t key);
 
 	static bool IsProcessElevated() noexcept;
+
+	static bool SetDebugPrivilege() noexcept;
 
 	// VARIANT 封装，自动管理生命周期
 	struct Variant : public VARIANT {
