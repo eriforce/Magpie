@@ -184,6 +184,33 @@
       "contributions": [
         "translation"
       ]
+    },
+    {
+      "login": "animeojisan",
+      "name": "animeojisan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/132756551?v=4",
+      "profile": "https://github.com/animeojisan",
+      "contributions": [
+        "translation"
+      ]
+    },
+    {
+      "login": "MuscularPuky",
+      "name": "MuscularPuky",
+      "avatar_url": "https://avatars.githubusercontent.com/u/93962018?v=4",
+      "profile": "https://github.com/MuscularPuky",
+      "contributions": [
+        "translation"
+      ]
+    },
+    {
+      "login": "Zoommod",
+      "name": "Zoommod",
+      "avatar_url": "https://avatars.githubusercontent.com/u/71239440?v=4",
+      "profile": "https://github.com/Zoommod",
+      "contributions": [
+        "translation"
+      ]
     }
   ],
   "contributorsPerLine": 7,
@@ -192,5 +219,6 @@
   "repoType": "github",
   "repoHost": "https://github.com",
   "skipCi": true,
-  "commitConvention": "angular"
+  "commitConvention": "angular",
+  "commitType": "docs"
 }

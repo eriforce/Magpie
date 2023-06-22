@@ -55,6 +55,9 @@
     <ClCompile Include="LocalizationService.cpp">
       <Filter>Services</Filter>
     </ClCompile>
+    <ClCompile Include="FileDialogHelper.cpp">
+      <Filter>Helpers</Filter>
+    </ClCompile>
     <ClCompile Include="ProfileApplication.cpp">
       <Filter>Models</Filter>
     </ClCompile>
@@ -116,6 +119,9 @@
     <ClInclude Include="app.base.h" />
     <ClInclude Include="LocalizationService.h">
       <Filter>Services</Filter>
+    </ClInclude>
+    <ClInclude Include="FileDialogHelper.h">
+      <Filter>Helpers</Filter>
     </ClInclude>
     <ClInclude Include="ProfileApplication.h">
       <Filter>Models</Filter>
@@ -233,9 +239,6 @@
     <Page Include="SettingsGroup.xaml">
       <Filter>Controls</Filter>
     </Page>
-    <Page Include="ToggleSwitch.xaml">
-      <Filter>Styles</Filter>
-    </Page>
     <Page Include="KeyVisual.xaml">
       <Filter>Controls</Filter>
     </Page>
@@ -253,6 +256,12 @@
     </Page>
     <Page Include="Button.xaml">
       <Filter>Styles</Filter>
+    </Page>
+    <Page Include="TitleBarControl.xaml">
+      <Filter>Controls</Filter>
+    </Page>
+    <Page Include="CaptionButtonsControl.xaml">
+      <Filter>Controls</Filter>
     </Page>
   </ItemGroup>
   <ItemGroup>
@@ -285,8 +294,17 @@
     <PRIResource Include="Resources.language-tr.resw">
       <Filter>Strings</Filter>
     </PRIResource>
-    <PRIResource Include="Resources.language-pt.resw">
+    <PRIResource Include="Resources.language-uk.resw">
       <Filter>Strings</Filter>
     </PRIResource>
+    <PRIResource Include="Resources.language-ko.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+    <PRIResource Include="Resources.language-pt-BR.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="conanfile.txt" />
   </ItemGroup>
 </Project>

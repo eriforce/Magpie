@@ -42,8 +42,9 @@ struct PageFrame : PageFrameT<PageFrame> {
 
 	void ScrollViewer_PointerPressed(IInspectable const&, Input::PointerRoutedEventArgs const&);
 	void ScrollViewer_ViewChanging(IInspectable const&, Controls::ScrollViewerViewChangingEventArgs const&);
+	void ScrollViewer_KeyDown(IInspectable const& sender, Input::KeyRoutedEventArgs const& args);
 
-	event_token PropertyChanged(Data::PropertyChangedEventHandler const& value) {
+	event_token PropertyChanged(PropertyChangedEventHandler const& value) {
 		return _propertyChangedEvent.add(value);
 	}
 
@@ -64,12 +65,7 @@ private:
 
 	void _Update();
 
-	void _UpdateHeaderStyle();
-
-	event<Data::PropertyChangedEventHandler> _propertyChangedEvent;
-
-	Microsoft::UI::Xaml::Controls::NavigationView _rootNavigationView{ nullptr };
-	Microsoft::UI::Xaml::Controls::NavigationView::DisplayModeChanged_revoker _displayModeChangedRevoker{};
+	event<PropertyChangedEventHandler> _propertyChangedEvent;
 };
 
 }

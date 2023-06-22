@@ -15,8 +15,6 @@
 #include "LocalizationService.h"
 
 using namespace ::Magpie::Core;
-using namespace winrt;
-using namespace Windows::ApplicationModel::Resources;
 
 namespace winrt::Magpie::App {
 
@@ -507,10 +505,14 @@ bool AppSettings::_Save(const _AppSettingsData& data) noexcept {
 	writer.Bool(data._isDebugMode);
 	writer.Key("disableEffectCache");
 	writer.Bool(data._isDisableEffectCache);
+	writer.Key("disableFontCache");
+	writer.Bool(data._isDisableFontCache);
 	writer.Key("saveEffectSources");
 	writer.Bool(data._isSaveEffectSources);
 	writer.Key("warningsAreErrors");
 	writer.Bool(data._isWarningsAreErrors);
+	writer.Key("allowScalingMaximized");
+	writer.Bool(data._isAllowScalingMaximized);
 	writer.Key("simulateExclusiveFullscreen");
 	writer.Bool(data._isSimulateExclusiveFullscreen);
 	writer.Key("alwaysRunAsAdmin");
@@ -652,8 +654,10 @@ void AppSettings::_LoadSettings(const rapidjson::GenericObject<true, rapidjson::
 	}
 	JsonHelper::ReadBool(root, "debugMode", _isDebugMode);
 	JsonHelper::ReadBool(root, "disableEffectCache", _isDisableEffectCache);
+	JsonHelper::ReadBool(root, "disableFontCache", _isDisableFontCache);
 	JsonHelper::ReadBool(root, "saveEffectSources", _isSaveEffectSources);
 	JsonHelper::ReadBool(root, "warningsAreErrors", _isWarningsAreErrors);
+	JsonHelper::ReadBool(root, "allowScalingMaximized", _isAllowScalingMaximized);
 	JsonHelper::ReadBool(root, "simulateExclusiveFullscreen", _isSimulateExclusiveFullscreen);
 	if (!JsonHelper::ReadBool(root, "alwaysRunAsAdmin", _isAlwaysRunAsAdmin, true)) {
 		// v0.10.0-preview1 使用 alwaysRunAsElevated

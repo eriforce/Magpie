@@ -6,7 +6,7 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
       xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
       mc:Ignorable="d">
-	<local:PageFrame x:Uid="Settings_PageFrame">
+	<local:PageFrame x:Name="SettingsPageFrame">
 		<StackPanel HorizontalAlignment="Stretch"
 		            ChildrenTransitions="{StaticResource SettingsCardsAnimations}"
 		            Orientation="Vertical">
@@ -114,6 +114,15 @@
 				</local:SettingsCard>
 			</local:SettingsGroup>
 			<local:SettingsGroup x:Uid="Settings_Advanced">
+				<local:SettingsCard x:Uid="Settings_Advanced_AllowScalingMaximized">
+					<local:SettingsCard.Icon>
+						<FontIcon Glyph="&#xE740;" />
+					</local:SettingsCard.Icon>
+					<local:SettingsCard.ActionContent>
+						<ToggleSwitch x:Uid="ToggleSwitch"
+						              IsOn="{x:Bind ViewModel.IsAllowScalingMaximized, Mode=TwoWay}" />
+					</local:SettingsCard.ActionContent>
+				</local:SettingsCard>
 				<local:SettingsCard x:Uid="Settings_Advanced_SimulateExclusiveFullscreen">
 					<local:SettingsCard.Icon>
 						<FontIcon Glyph="&#xec46;" />
@@ -152,6 +161,10 @@
 							<local:SettingsCard Style="{StaticResource ExpanderContentSettingStyle}">
 								<CheckBox x:Uid="Settings_DeveloperOptions_DisableEffectCache"
 								          IsChecked="{x:Bind ViewModel.IsDisableEffectCache, Mode=TwoWay}" />
+							</local:SettingsCard>
+							<local:SettingsCard Style="{StaticResource ExpanderContentSettingStyle}">
+								<CheckBox x:Uid="Settings_DeveloperOptions_DisableFontCache"
+								          IsChecked="{x:Bind ViewModel.IsDisableFontCache, Mode=TwoWay}" />
 							</local:SettingsCard>
 							<local:SettingsCard Style="{StaticResource ExpanderContentSettingStyle}">
 								<CheckBox x:Uid="Settings_DeveloperOptions_SaveEffectSources"

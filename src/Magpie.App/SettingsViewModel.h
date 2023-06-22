@@ -44,6 +44,9 @@ struct SettingsViewModel : SettingsViewModelT<SettingsViewModel> {
 	bool IsAlwaysRunAsAdmin() const noexcept;
 	void IsAlwaysRunAsAdmin(bool value) noexcept;
 
+	bool IsAllowScalingMaximized() const noexcept;
+	void IsAllowScalingMaximized(bool value) noexcept;
+
 	bool IsSimulateExclusiveFullscreen() const noexcept;
 	void IsSimulateExclusiveFullscreen(bool value) noexcept;
 
@@ -55,6 +58,9 @@ struct SettingsViewModel : SettingsViewModelT<SettingsViewModel> {
 
 	bool IsDisableEffectCache() const noexcept;
 	void IsDisableEffectCache(bool value) noexcept;
+
+	bool IsDisableFontCache() const noexcept;
+	void IsDisableFontCache(bool value) noexcept;
 
 	bool IsSaveEffectSources() const noexcept;
 	void IsSaveEffectSources(bool value) noexcept;

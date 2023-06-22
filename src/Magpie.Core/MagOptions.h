@@ -43,6 +43,8 @@ struct MagFlags {
 	static constexpr const uint32_t AdjustCursorSpeed = 0x800;
 	static constexpr const uint32_t DrawCursor = 0x1000;
 	static constexpr const uint32_t DisableDirectFlip = 0x2000;
+	static constexpr const uint32_t DisableFontCache = 0x4000;
+	static constexpr const uint32_t AllowScalingMaximized = 0x8000;
 };
 
 struct DownscalingEffect {
@@ -79,8 +81,10 @@ struct MagOptions {
 	DEFINE_FLAG_ACCESSOR(IsDisableWindowResizing, MagFlags::DisableWindowResizing, flags)
 	DEFINE_FLAG_ACCESSOR(IsDebugMode, MagFlags::BreakpointMode, flags)
 	DEFINE_FLAG_ACCESSOR(IsDisableEffectCache, MagFlags::DisableEffectCache, flags)
+	DEFINE_FLAG_ACCESSOR(IsDisableFontCache, MagFlags::DisableFontCache, flags)
 	DEFINE_FLAG_ACCESSOR(IsSaveEffectSources, MagFlags::SaveEffectSources, flags)
 	DEFINE_FLAG_ACCESSOR(IsWarningsAreErrors, MagFlags::WarningsAreErrors, flags)
+	DEFINE_FLAG_ACCESSOR(IsAllowScalingMaximized, MagFlags::AllowScalingMaximized, flags)
 	DEFINE_FLAG_ACCESSOR(IsSimulateExclusiveFullscreen, MagFlags::SimulateExclusiveFullscreen, flags)
 	DEFINE_FLAG_ACCESSOR(Is3DGameMode, MagFlags::Is3DGameMode, flags)
 	DEFINE_FLAG_ACCESSOR(IsShowFPS, MagFlags::ShowFPS, flags)

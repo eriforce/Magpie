@@ -8,9 +8,7 @@
 #include "Win32Utils.h"
 #include "CommonSharedConstants.h"
 #include "LocalizationService.h"
-
-using namespace winrt;
-using namespace Windows::ApplicationModel::Resources;
+#include "MagService.h"
 
 namespace winrt::Magpie::App::implementation {
 
@@ -172,6 +170,18 @@ void SettingsViewModel::IsAlwaysRunAsAdmin(bool value) noexcept {
 	AppSettings::Get().IsAlwaysRunAsAdmin(value);
 }
 
+bool SettingsViewModel::IsAllowScalingMaximized() const noexcept {
+	return AppSettings::Get().IsAllowScalingMaximized();
+}
+
+void SettingsViewModel::IsAllowScalingMaximized(bool value) noexcept {
+	AppSettings::Get().IsAllowScalingMaximized(value);
+
+	if (value) {
+		MagService::Get().CheckForeground();
+	}
+}
+
 bool SettingsViewModel::IsSimulateExclusiveFullscreen() const noexcept {
 	return AppSettings::Get().IsSimulateExclusiveFullscreen();
 }
@@ -230,6 +240,21 @@ void SettingsViewModel::IsDisableEffectCache(bool value) noexcept {
 
 	settings.IsDisableEffectCache(value);
 	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"IsDisableEffectCache"));
+}
+
+bool SettingsViewModel::IsDisableFontCache() const noexcept {
+	return AppSettings::Get().IsDisableFontCache();
+}
+
+void SettingsViewModel::IsDisableFontCache(bool value) noexcept {
+	AppSettings& settings = AppSettings::Get();
+
+	if (settings.IsDisableFontCache() == value) {
+		return;
+	}
+
+	settings.IsDisableFontCache(value);
+	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"IsDisableFontCache"));
 }
 
 bool SettingsViewModel::IsSaveEffectSources() const noexcept {

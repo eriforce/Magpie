@@ -255,9 +255,6 @@
   <data name="Settings_General_Theme_Light.Content" xml:space="preserve">
     <value>浅色</value>
   </data>
-  <data name="Settings_PageFrame.Title" xml:space="preserve">
-    <value>设置</value>
-  </data>
   <data name="ToggleSwitch.OffContent" xml:space="preserve">
     <value>关</value>
   </data>
@@ -798,5 +795,62 @@
   </data>
   <data name="Profile_Advanced_LaunchParameters_Edit.[using:Windows.UI.Xaml.Controls]ToolTipService.ToolTip" xml:space="preserve">
     <value>编辑</value>
+  </data>
+  <data name="Overlay_Profiler" xml:space="preserve">
+    <value>性能分析器</value>
+  </data>
+  <data name="Overlay_Profiler_CaptureMethod" xml:space="preserve">
+    <value>捕获方式</value>
+  </data>
+  <data name="Overlay_Profiler_VSync" xml:space="preserve">
+    <value>垂直同步</value>
+  </data>
+  <data name="Overlay_FPS_Opacity" xml:space="preserve">
+    <value>不透明度</value>
+  </data>
+  <data name="Overlay_Profiler_FrameStatistics" xml:space="preserve">
+    <value>帧统计</value>
+  </data>
+  <data name="Overlay_Profiler_FrameStatistics_SwitchToFrameRates" xml:space="preserve">
+    <value>切换到帧率</value>
+  </data>
+  <data name="Overlay_Profiler_FrameStatistics_SwitchToFrameTimings" xml:space="preserve">
+    <value>切换到帧时间</value>
+  </data>
+  <data name="Overlay_Profiler_Timings" xml:space="preserve">
+    <value>渲染用时</value>
+  </data>
+  <data name="Overlay_Profiler_Timings_SwitchToEffects" xml:space="preserve">
+    <value>切换到效果</value>
+  </data>
+  <data name="Overlay_Profiler_Timings_SwitchToPasses" xml:space="preserve">
+    <value>切换到通道</value>
+  </data>
+  <data name="Overlay_Profiler_Timings_Total" xml:space="preserve">
+    <value>总计</value>
+  </data>
+  <data name="Overlay_FPS_Lock" xml:space="preserve">
+    <value>锁定</value>
+  </data>
+  <data name="Overlay_FPS_Unlock" xml:space="preserve">
+    <value>解锁</value>
+  </data>
+  <data name="Settings_DeveloperOptions_DisableFontCache.Content" xml:space="preserve">
+    <value>禁用字体缓存</value>
+  </data>
+  <data name="Settings_Advanced_AllowScalingMaximized.Title" xml:space="preserve">
+    <value>允许缩放最大化或全屏的窗口</value>
+  </data>
+  <data name="FileDialog_JsonFile" xml:space="preserve">
+    <value>JSON 文件</value>
+  </data>
+  <data name="Profile_MoreOptions_ChangeExecutableForLaunching.Text" xml:space="preserve">
+    <value>更改用于启动程序的可执行文件</value>
+  </data>
+  <data name="FileDialog_ExeFile" xml:space="preserve">
+    <value>可执行文件</value>
+  </data>
+  <data name="SelectLauncherDialog_Title" xml:space="preserve">
+    <value>选择用于启动程序的可执行文件</value>
   </data>
 </root>

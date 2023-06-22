@@ -15,9 +15,9 @@
 #include "ScalingMode.h"
 #include <dxgi.h>
 #include "MagService.h"
+#include "FileDialogHelper.h"
 
 using namespace winrt;
-using namespace Windows::ApplicationModel::Resources;
 using namespace Windows::Graphics::Display;
 using namespace Windows::Graphics::Imaging;
 using namespace Windows::UI::Xaml::Controls;

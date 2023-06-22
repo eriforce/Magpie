@@ -2,7 +2,6 @@
 #include "OverlayDrawer.h"
 #include "MagApp.h"
 #include "DeviceResources.h"
-#include <imgui.h>
 #include "ImGuiImpl.h"
 #include "Renderer.h"
 #include "GPUTimer.h"
@@ -13,15 +12,32 @@
 #include "CommonSharedConstants.h"
 #include "EffectDesc.h"
 #include <bit>	// std::bit_ceil
-#include <Wbemidl.h>
 #include <random>
-
-#pragma comment(lib, "wbemuuid.lib")
-
+#include "ImGuiHelper.h"
+#include "ImGuiFontsCacheManager.h"
 
 namespace Magpie::Core {
 
-OverlayDrawer::OverlayDrawer() {
+static const std::wstring& GetSystemFontsFolder() noexcept {
+	static std::wstring result;
+
+	if (result.empty()) {
+		wchar_t* fontsFolder = nullptr;
+		HRESULT hr = SHGetKnownFolderPath(FOLDERID_Fonts, 0, NULL, &fontsFolder);
+		if (FAILED(hr)) {
+			CoTaskMemFree(fontsFolder);
+			Logger::Get().ComError("SHGetKnownFolderPath 失败", hr);
+			return result;
+		}
+
+		result = fontsFolder;
+		CoTaskMemFree(fontsFolder);
+	}
+
+	return result;
+}
+
+OverlayDrawer::OverlayDrawer() noexcept {
 	HWND hwndSrc = MagApp::Get().GetHwndSrc();
 	_isSrcMainWnd = Win32Utils::GetWndClassName(hwndSrc) == CommonSharedConstants::MAIN_WINDOW_CLASS_NAME;
 }
@@ -170,63 +186,38 @@ static SmallVector<UINT> GenerateTimelineColors() {
 	return result;
 }
 
-bool OverlayDrawer::Initialize() {
+bool OverlayDrawer::Initialize() noexcept {
 	_imguiImpl.reset(new ImGuiImpl());
 	if (!_imguiImpl->Initialize()) {
 		Logger::Get().Error("初始化 ImGuiImpl 失败");
 		return false;
 	}
 
-	ImGuiIO& io = ImGui::GetIO();
-
 	_dpiScale = GetDpiForWindow(MagApp::Get().GetHwndHost()) / 96.0f;
 
 	ImGui::StyleColorsDark();
 	ImGuiStyle& style = ImGui::GetStyle();
-	style.WindowRounding = 6;
+	style.PopupRounding = style.WindowRounding = 6;
 	style.FrameBorderSize = 1;
 	style.FrameRounding = 2;
 	style.WindowMinSize = ImVec2(10, 10);
 	style.ScaleAllSizes(_dpiScale);
 
-	static std::vector<BYTE> fontData;
-	if (fontData.empty()) {
-		if (!Win32Utils::ReadFile(
-			StrUtils::ConcatW(CommonSharedConstants::ASSETS_DIR, L"NotoSansSC-Regular.otf").c_str(),
-			fontData
-		)) {
-			Logger::Get().Error("读取字体文件失败");
-			return false;
-		}
+	if (!_BuildFonts()) {
+		Logger::Get().Error("_BuildFonts 失败");
+		return false;
 	}
-
-	ImFontConfig config;
-	config.FontDataOwnedByAtlas = false;
-
-	ImVector<ImWchar> uiRanges;
-	ImFontGlyphRangesBuilder builder;
-	builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
-	builder.AddText("■");
-	builder.BuildRanges(&uiRanges);
-
-	_fontUI = io.Fonts->AddFontFromMemoryTTF(fontData.data(), (int)fontData.size(), std::floor(18 * _dpiScale), &config, uiRanges.Data);
-
-	ImVector<ImWchar> fpsRanges;
-	builder.Clear();
-	builder.AddText("0123456789 FPS");
-	builder.BuildRanges(&fpsRanges);
-	// FPS 的字体尺寸不跟随系统缩放
-	_fontFPS = io.Fonts->AddFontFromMemoryTTF(fontData.data(), (int)fontData.size(), 32, &config, fpsRanges.Data);
-
-	io.Fonts->Build();
 
 	_RetrieveHardwareInfo();
 	_timelineColors = GenerateTimelineColors();
 
+	// 将 _fontUI 设为默认字体
+	ImGui::GetIO().FontDefault = _fontUI;
+
 	return true;
 }
 
-void OverlayDrawer::Draw() {
+void OverlayDrawer::Draw() noexcept {
 	bool isShowFPS = MagApp::Get().GetOptions().IsShowFPS();
 
 	if (!_isUIVisiable && !isShowFPS) {
@@ -234,7 +225,6 @@ void OverlayDrawer::Draw() {
 	}
 
 	_imguiImpl->NewFrame();
-	ImGui::PushFont(_fontUI);
 
 	if (isShowFPS) {
 		_DrawFPS();
@@ -243,13 +233,12 @@ void OverlayDrawer::Draw() {
 	if (_isUIVisiable) {
 		_DrawUI();
 	}
-
-	ImGui::PopFont();
+	
 	ImGui::Render();
 	_imguiImpl->EndFrame();
 }
 
-void OverlayDrawer::SetUIVisibility(bool value) {
+void OverlayDrawer::SetUIVisibility(bool value) noexcept {
 	if (_isUIVisiable == value) {
 		return;
 	}
@@ -265,7 +254,7 @@ void OverlayDrawer::SetUIVisibility(bool value) {
 
 			// 使源窗口无法接收用户输入
 			_EnableSrcWnd(false);
-			// 由 ImGUI 绘制光标
+			// 由 ImGui 绘制光标
 			ImGui::GetIO().MouseDrawCursor = true;
 		}
 
@@ -294,7 +283,370 @@ void OverlayDrawer::SetUIVisibility(bool value) {
 	}
 }
 
-void OverlayDrawer::_DrawFPS() {
+static const std::wstring& GetAppLanguage() noexcept {
+	static std::wstring language;
+	if (language.empty()) {
+		winrt::ResourceContext resourceContext = winrt::ResourceContext::GetForViewIndependentUse();
+		language = resourceContext.QualifierValues().Lookup(L"Language");
+		StrUtils::ToLowerCase(language);
+	}
+	return language;
+}
+
+bool OverlayDrawer::_BuildFonts() noexcept {
+	const std::wstring& language = GetAppLanguage();
+
+	ImFontAtlas& fontAtlas = *ImGui::GetIO().Fonts;
+
+	bool fontCacheDisabled = MagApp::Get().GetOptions().IsDisableFontCache();
+	if (!fontCacheDisabled && ImGuiFontsCacheManager::Get().Load(language, fontAtlas)) {
+		_fontUI = fontAtlas.Fonts[0];
+		_fontMonoNumbers = fontAtlas.Fonts[1];
+		_fontFPS = fontAtlas.Fonts[2];
+		return true;
+	}
+
+	fontAtlas.Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight;
+	if (!MagApp::Get().GetOptions().Is3DGameMode()) {
+		// 非 3D 游戏模式无需 ImGui 绘制光标
+		fontAtlas.Flags |= ImFontAtlasFlags_NoMouseCursors;
+	}
+
+	std::wstring fontPath = GetSystemFontsFolder();
+	if (Win32Utils::GetOSVersion().IsWin11()) {
+		fontPath += L"\\SegUIVar.ttf";
+	} else {
+		fontPath += L"\\segoeui.ttf";
+	}
+
+	std::vector<uint8_t> fontData;
+	if (!Win32Utils::ReadFile(fontPath.c_str(), fontData)) {
+		Logger::Get().Error("读取字体文件失败");
+		return false;
+	}
+
+	// 构建字体前 uiRanges 不能析构，因为 ImGui 只保存了指针
+	ImVector<ImWchar> uiRanges;
+	_BuildFontUI(language, fontData, uiRanges);
+	_BuildFontFPS(fontData);
+
+	if (!fontAtlas.Build()) {
+		Logger::Get().Error("构建字体失败");
+		return false;
+	}
+
+	if (!fontCacheDisabled) {
+		ImGuiFontsCacheManager::Get().Save(language, fontAtlas);
+	}
+	
+	return true;
+}
+
+void OverlayDrawer::_BuildFontUI(std::wstring_view language, const std::vector<uint8_t>& fontData, ImVector<ImWchar>& uiRanges) noexcept {
+	ImFontAtlas& fontAtlas = *ImGui::GetIO().Fonts;
+
+	std::string extraFontPath;
+	const ImWchar* extraRanges = nullptr;
+	int extraFontNo = 0;
+
+	ImFontGlyphRangesBuilder builder;
+
+	if (language == L"en-us") {
+		builder.AddRanges(ImGuiHelper::ENGLISH_RANGES);
+	} else if (language == L"es" || language == L"pt-br") {
+		// Basic Latin + Latin-1 Supplement
+		// 参见 https://en.wikipedia.org/wiki/Latin-1_Supplement
+		builder.AddRanges(fontAtlas.GetGlyphRangesDefault());
+	} else if (language == L"ru" || language == L"uk") {
+		builder.AddRanges(fontAtlas.GetGlyphRangesCyrillic());
+	} else if (language == L"tr") {
+		builder.AddRanges(ImGuiHelper::TURKISH_RANGES);
+	} else {
+		builder.AddRanges(fontAtlas.GetGlyphRangesDefault());
+
+		// 一些语言需要加载额外的字体：
+		// 简体中文 -> Microsoft YaHei UI
+		// 繁体中文 -> Microsoft JhengHei UI
+		// 日语 -> Yu Gothic UI
+		// 韩语/朝鲜语 -> Malgun Gothic
+		// 参见 https://learn.microsoft.com/en-us/windows/apps/design/style/typography#fonts-for-non-latin-languages
+
+		extraFontPath = StrUtils::UTF16ToUTF8(GetSystemFontsFolder());
+		extraFontPath.push_back(L'\\');
+		if (language == L"zh-hans") {
+			// msyh.ttc: 0 是微软雅黑，1 是 Microsoft YaHei UI
+			extraFontPath += "msyh.ttc";
+			extraFontNo = 1;
+			extraRanges = ImGuiHelper::GetGlyphRangesChineseSimplifiedOfficial();
+		} else if (language == L"zh-hant") {
+			// msjh.ttc: 0 是 Microsoft JhengHei，1 是 Microsoft JhengHei UI
+			extraFontPath += "msjh.ttc";
+			extraFontNo = 1;
+			extraRanges = ImGuiHelper::GetGlyphRangesChineseTraditionalOfficial();
+		} else if (language == L"ja") {
+			// YuGothM.ttc: 0 是 Yu Gothic Medium，1 是 Yu Gothic UI
+			extraFontPath += "YuGothM.ttc";
+			extraFontNo = 1;
+			extraRanges = fontAtlas.GetGlyphRangesJapanese();
+		} else if (language == L"ko") {
+			extraFontPath += "malgun.ttf";
+			extraRanges = fontAtlas.GetGlyphRangesKorean();
+		}
+	}
+	builder.SetBit(L'■');
+	builder.BuildRanges(&uiRanges);
+
+	ImFontConfig config;
+	config.FontDataOwnedByAtlas = false;
+
+	const float fontSize = 18 * _dpiScale;
+
+	//////////////////////////////////////////////////////////
+	// 
+	// uiRanges (+ extraRanges) -> _fontUI
+	// 
+	//////////////////////////////////////////////////////////
+
+
+#ifdef _DEBUG
+	std::char_traits<char>::copy(config.Name, "_fontUI", std::size(config.Name));
+#endif
+
+	_fontUI = fontAtlas.AddFontFromMemoryTTF(
+		(void*)fontData.data(), (int)fontData.size(), fontSize, &config, uiRanges.Data);
+
+	if (extraRanges) {
+		assert(Win32Utils::FileExists(StrUtils::UTF8ToUTF16(extraFontPath).c_str()));
+
+		// 在 MergeMode 下已有字符会跳过而不是覆盖
+		config.MergeMode = true;
+		config.FontNo = extraFontNo;
+		// 额外字体数据由 ImGui 管理，退出缩放时释放
+		config.FontDataOwnedByAtlas = true;
+		fontAtlas.AddFontFromFileTTF(extraFontPath.c_str(), fontSize, &config, extraRanges);
+		config.FontDataOwnedByAtlas = false;
+		config.FontNo = 0;
+		config.MergeMode = false;
+	}
+
+	//////////////////////////////////////////////////////////
+	//
+	// NUMBER_RANGES + NOT_NUMBER_RANGES -> _fontMonoNumbers
+	//
+	//////////////////////////////////////////////////////////
+
+#ifdef _DEBUG
+	std::char_traits<char>::copy(config.Name, "_fontMonoNumbers", std::size(config.Name));
+#endif
+
+	// 等宽的数字字符
+	config.GlyphMinAdvanceX = config.GlyphMaxAdvanceX = fontSize * 0.42f;
+	_fontMonoNumbers = fontAtlas.AddFontFromMemoryTTF(
+		(void*)fontData.data(), (int)fontData.size(), fontSize, &config, ImGuiHelper::NUMBER_RANGES);
+
+	// 其他不等宽的字符
+	config.MergeMode = true;
+	config.GlyphMinAdvanceX = 0;
+	config.GlyphMaxAdvanceX = std::numeric_limits<float>::max();
+	fontAtlas.AddFontFromMemoryTTF(
+		(void*)fontData.data(), (int)fontData.size(), fontSize, &config, ImGuiHelper::NOT_NUMBER_RANGES);
+}
+
+void OverlayDrawer::_BuildFontFPS(const std::vector<uint8_t>& fontData) noexcept {
+	ImFontAtlas& fontAtlas = *ImGui::GetIO().Fonts;
+
+	ImFontConfig config;
+	config.FontDataOwnedByAtlas = false;
+
+	const float fpsSize = 24 * _dpiScale;
+
+	//////////////////////////////////////////////////////////
+	//
+	// NUMBER_RANGES + " FPS" -> _fontFPS
+	// 
+	//////////////////////////////////////////////////////////
+
+#ifdef _DEBUG
+	std::char_traits<char>::copy(config.Name, "_fontFPS", std::size(config.Name));
+#endif
+
+	// 等宽的数字字符
+	config.MergeMode = false;
+	config.GlyphMinAdvanceX = config.GlyphMaxAdvanceX = fpsSize * 0.42f;
+	_fontFPS = fontAtlas.AddFontFromMemoryTTF(
+		(void*)fontData.data(), (int)fontData.size(), fpsSize, &config, ImGuiHelper::NUMBER_RANGES);
+
+	// 其他不等宽的字符
+	config.MergeMode = true;
+	config.GlyphMinAdvanceX = 0;
+	config.GlyphMaxAdvanceX = std::numeric_limits<float>::max();
+	fontAtlas.AddFontFromMemoryTTF(
+		(void*)fontData.data(), (int)fontData.size(), fpsSize, &config, (const ImWchar*)L"  FFPPSS");
+}
+
+static std::string_view GetEffectDisplayName(const EffectDesc* desc) noexcept {
+	auto delimPos = desc->name.find_last_of('\\');
+	if (delimPos == std::string::npos) {
+		return desc->name;
+	} else {
+		return std::string_view(desc->name.begin() + delimPos + 1, desc->name.end());
+	}
+}
+
+static void DrawTextWithFont(const char* text, ImFont* font) noexcept {
+	ImGui::PushFont(font);
+	ImGui::TextUnformatted(text);
+	ImGui::PopFont();
+}
+
+// 返回鼠标悬停的项的序号，未悬停于任何项返回 -1
+int OverlayDrawer::_DrawEffectTimings(
+	const _EffectTimings& et,
+	bool showPasses,
+	float maxWindowWidth,
+	std::span<const ImColor> colors,
+	bool singleEffect
+) noexcept {
+	ImGui::TableNextRow();
+	ImGui::TableNextColumn();
+
+	int result = -1;
+
+	if (!singleEffect && (et.passTimings.size() == 1 || !showPasses)) {
+		ImGui::Selectable("", false, ImGuiSelectableFlags_SpanAllColumns);
+		if (ImGui::IsItemHovered()) {
+			result = 0;
+		}
+		ImGui::SameLine(0, 0);
+
+		ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)colors[0]);
+		ImGui::TextUnformatted("■");
+		ImGui::PopStyleColor();
+		ImGui::SameLine(0, 3);
+	}
+
+	ImGui::TextUnformatted(std::string(GetEffectDisplayName(et.desc)).c_str());
+
+	ImGui::TableNextColumn();
+
+	const float rightAlignSpace = ImGui::CalcTextSize("0").x;
+
+	if (et.passTimings.size() > 1) {
+		if (showPasses) {
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 0.5f));
+		}
+
+		if (et.totalTime < 10) {
+			// 右对齐
+			ImGui::Dummy(ImVec2(rightAlignSpace, 0));
+			ImGui::SameLine(0, 0);
+		}
+		DrawTextWithFont(fmt::format("{:.3f} ms", et.totalTime).c_str(), _fontMonoNumbers);
+
+		if (showPasses) {
+			ImGui::PopStyleColor();
+		}
+
+		if (showPasses) {
+			for (size_t j = 0; j < et.passTimings.size(); ++j) {
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+
+				ImGui::Indent(20);
+
+				float fontHeight = ImGui::GetFont()->FontSize;
+				std::string time = fmt::format("{:.3f} ms", et.passTimings[j]);
+				// 手动计算布局
+				// 运行到此处时还无法确定是否需要滚动条，这里始终减去滚动条的宽度，否则展开时可能会有一帧的跳跃
+				float descWrap = maxWindowWidth - ImGui::CalcTextSize(time.c_str()).x - ImGui::GetStyle().WindowPadding.x - ImGui::GetStyle().ScrollbarSize - ImGui::GetStyle().CellPadding.x * 2;
+				float descHeight = ImGui::CalcTextSize(et.desc->passes[j].desc.c_str(), nullptr, false, descWrap - ImGui::GetCursorPos().x - ImGui::CalcTextSize("■").x - 3).y;
+
+				ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)colors[j]);
+				if (descHeight >= fontHeight * 2) {
+					// 不知为何 SetCursorPos 不起作用
+					// 所以这里使用占位竖直居中颜色框
+					ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
+					ImGui::BeginGroup();
+					ImGui::Dummy(ImVec2(0, (descHeight - fontHeight) / 2));
+					ImGui::TextUnformatted("■");
+					ImGui::EndGroup();
+					ImGui::PopStyleVar();
+				} else {
+					ImGui::TextUnformatted("■");
+				}
+
+				ImGui::PopStyleColor();
+				ImGui::SameLine(0, 3);
+
+				ImGui::PushTextWrapPos(descWrap);
+				ImGui::TextUnformatted(et.desc->passes[j].desc.c_str());
+				ImGui::PopTextWrapPos();
+				ImGui::Unindent(20);
+
+				ImGui::SameLine(0, 0);
+				ImGui::Selectable("", false, ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, descHeight));
+				if (ImGui::IsItemHovered()) {
+					result = (int)j;
+				}
+
+				ImGui::TableNextColumn();
+				// 描述过长导致换行时竖直居中时间
+				if (descHeight >= fontHeight * 2) {
+					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (descHeight - fontHeight) / 2);
+				}
+
+				if (et.passTimings[j] < 10) {
+					ImGui::Dummy(ImVec2(rightAlignSpace, 0));
+					ImGui::SameLine(0, 0);
+				}
+				DrawTextWithFont(time.c_str(), _fontMonoNumbers);
+			}
+		}
+	} else {
+		if (et.totalTime < 10) {
+			ImGui::Dummy(ImVec2(rightAlignSpace, 0));
+			ImGui::SameLine(0, 0);
+		}
+		DrawTextWithFont(fmt::format("{:.3f} ms", et.totalTime).c_str(), _fontMonoNumbers);
+	}
+
+	return result;
+}
+
+void OverlayDrawer::_DrawTimelineItem(ImU32 color, float dpiScale, std::string_view name, float time, float effectsTotalTime, bool selected) {
+	ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, color);
+	ImGui::PushStyleColor(ImGuiCol_HeaderActive, color);
+	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, color);
+	ImGui::PushStyleColor(ImGuiCol_Header, color);
+	ImGui::Selectable("", selected);
+	ImGui::PopStyleColor(3);
+
+	if (ImGui::IsItemHovered() || ImGui::IsItemClicked()) {
+		std::string content = fmt::format("{}\n{:.3f} ms\n{}%", name, time, std::lroundf(time / effectsTotalTime * 100));
+		ImGui::PushFont(_fontMonoNumbers);
+		ImGuiImpl::Tooltip(content.c_str(), 500 * dpiScale);
+		ImGui::PopFont();
+	}
+
+	// 空间足够时显示文字
+	std::string text;
+	if (selected) {
+		text = fmt::format("{}%", std::lroundf(time / effectsTotalTime * 100));
+	} else {
+		text.assign(name);
+	}
+
+	float textWidth = ImGui::CalcTextSize(text.c_str()).x;
+	float itemWidth = ImGui::GetItemRectSize().x;
+	float itemSpacing = ImGui::GetStyle().ItemSpacing.x;
+	if (itemWidth - (selected ? 0 : itemSpacing) > textWidth + 4 * _dpiScale) {
+		ImGui::SameLine(0, 0);
+		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (itemWidth - textWidth - itemSpacing) / 2);
+		ImGui::TextUnformatted(text.c_str());
+	}
+}
+
+void OverlayDrawer::_DrawFPS() noexcept {
 	static float oldOpacity = 0.0f;
 	static float opacity = 0.0f;
 	static bool isLocked = false;
@@ -359,283 +711,24 @@ void OverlayDrawer::_DrawFPS() {
 	ImGui::PopStyleVar();
 
 	if (ImGui::BeginPopupContextWindow()) {
-		ImGui::PushItemWidth(200);
-		ImGui::SliderFloat("Opacity", &opacity, 0.0f, 1.0f);
+		ImGui::PushItemWidth(150 * _dpiScale);
+		ImGui::PushFont(_fontMonoNumbers);
+		ImGui::SliderFloat("##FPS_Opacity", &opacity, 0.0f, 1.0f);
+		ImGui::PopFont();
+		ImGui::SameLine();
+		ImGui::TextUnformatted(_GetResourceString(L"Overlay_FPS_Opacity").c_str());
 		ImGui::Separator();
-		if (ImGui::MenuItem(isLocked ? "Unlock" : "Lock", nullptr, nullptr)) {
+		const std::string& lockStr = _GetResourceString(isLocked ? L"Overlay_FPS_Unlock" : L"Overlay_FPS_Lock");
+		if (ImGui::MenuItem(lockStr.c_str(), nullptr, nullptr)) {
 			isLocked = !isLocked;
 		}
 		ImGui::PopItemWidth();
+
 		ImGui::EndPopup();
 	}
 
 	ImGui::End();
 	ImGui::PopStyleVar();
-}
-
-#ifdef _M_X64
-// 只在 x86 可用
-static std::string GetCPUNameViaCPUID() {
-	std::string cpuName(48, '\0');
-
-	std::array<int, 4> cpuInfo{};
-
-	__cpuid(cpuInfo.data(), 0);
-
-	// Calling __cpuid with 0x80000000 as the function_id argument
-	// gets the number of the highest valid extended ID.
-	__cpuid(cpuInfo.data(), 0x80000000);
-
-	if (cpuInfo[0] < 0x80000004) {
-		return {};
-	}
-
-	__cpuidex(cpuInfo.data(), 0x80000002, 0);
-	memcpy(cpuName.data(), cpuInfo.data(), sizeof(cpuInfo));
-	__cpuidex(cpuInfo.data(), 0x80000003, 0);
-	memcpy(cpuName.data() + 16, cpuInfo.data(), sizeof(cpuInfo));
-	__cpuidex(cpuInfo.data(), 0x80000004, 0);
-	memcpy(cpuName.data() + 32, cpuInfo.data(), sizeof(cpuInfo));
-
-	cpuName.resize(StrUtils::StrLen(cpuName.c_str()));
-	StrUtils::Trim(cpuName);
-	return cpuName;
-}
-#endif
-
-// 非常慢，需要大约 18 ms
-static std::string GetCPUNameViaWMI() {
-	winrt::com_ptr<IWbemLocator> wbemLocator = winrt::try_create_instance<IWbemLocator>(CLSID_WbemLocator);
-	if (!wbemLocator) {
-		Logger::Get().Error("创建 WbemLocator 失败");
-		return "";
-	}
-
-	winrt::com_ptr<IWbemServices> wbemServices;
-	winrt::com_ptr<IEnumWbemClassObject> enumWbemClassObject;
-	winrt::com_ptr<IWbemClassObject> wbemClassObject;
-
-	HRESULT hr = wbemLocator->ConnectServer(
-		Win32Utils::BStr(L"ROOT\\CIMV2"),
-		nullptr,
-		nullptr,
-		nullptr,
-		0,
-		nullptr,
-		nullptr,
-		wbemServices.put()
-	);
-	if (hr != WBEM_S_NO_ERROR) {
-		return "";
-	}
-
-	hr = CoSetProxyBlanket(
-		wbemServices.get(),
-		RPC_C_AUTHN_WINNT,
-		RPC_C_AUTHZ_NONE,
-		nullptr,
-		RPC_C_AUTHN_LEVEL_CALL,
-		RPC_C_IMP_LEVEL_IMPERSONATE,
-		NULL,
-		EOAC_NONE
-	);
-	if (FAILED(hr)) {
-		return "";
-	}
-
-	hr = wbemServices->ExecQuery(
-		Win32Utils::BStr(L"WQL"),
-		Win32Utils::BStr(L"SELECT NAME FROM Win32_Processor"),
-		WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
-		nullptr,
-		enumWbemClassObject.put()
-	);
-	if (hr != WBEM_S_NO_ERROR) {
-		return "";
-	}
-
-	ULONG uReturn = 0;
-	hr = enumWbemClassObject->Next(WBEM_INFINITE, 1, wbemClassObject.put(), &uReturn);
-	if (hr != WBEM_S_NO_ERROR || uReturn <= 0) {
-		return "";
-	}
-
-	VARIANT value;
-	VariantInit(&value);
-	hr = wbemClassObject->Get(Win32Utils::BStr(L"Name"), 0, &value, 0, 0);
-	if (hr != WBEM_S_NO_ERROR || value.vt != VT_BSTR) {
-		return "";
-	}
-
-	std::string result = Win32Utils::BStr(value.bstrVal).ToUTF8();
-	StrUtils::Trim(result);
-	return result;
-}
-
-static std::string GetCPUName() {
-#ifdef _M_X64
-	std::string result = GetCPUNameViaCPUID();
-	if (!result.empty()) {
-		return result;
-	}
-#endif // _M_X64
-
-	return GetCPUNameViaWMI();
-}
-
-static std::string_view GetEffectDisplayName(const EffectDesc* desc) {
-	auto delimPos = desc->name.find_last_of('\\');
-	if (delimPos == std::string::npos) {
-		return desc->name;
-	} else {
-		return std::string_view(desc->name.begin() + delimPos + 1, desc->name.end());
-	}
-}
-
-struct EffectTimings {
-	const EffectDesc* desc = nullptr;
-	std::span<const float> passTimings;
-	float totalTime = 0.0f;
-};
-
-// 返回鼠标悬停的项的序号，未悬停于任何项返回 -1
-static int DrawEffectTimings(const EffectTimings& et, bool showPasses, float maxWindowWidth, std::span<const ImColor> colors, bool singleEffect) {
-	ImGui::TableNextRow();
-	ImGui::TableNextColumn();
-
-	int result = -1;
-
-	if (!singleEffect && (et.passTimings.size() == 1 || !showPasses)) {
-		ImGui::Selectable("", false, ImGuiSelectableFlags_SpanAllColumns);
-		if (ImGui::IsItemHovered()) {
-			result = 0;
-		}
-		ImGui::SameLine(0, 0);
-
-		ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)colors[0]);
-		ImGui::TextUnformatted("■");
-		ImGui::PopStyleColor();
-		ImGui::SameLine(0, 3);
-	}
-
-	ImGui::TextUnformatted(std::string(GetEffectDisplayName(et.desc)).c_str());
-
-	ImGui::TableNextColumn();
-
-	const float rightAlignSpace = ImGui::CalcTextSize("0").x;
-
-	if (et.passTimings.size() > 1) {
-		if (showPasses) {
-			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, 0.5f));
-		}
-
-		if (et.totalTime < 10) {
-			// 右对齐
-			ImGui::Dummy(ImVec2(rightAlignSpace, 0));
-			ImGui::SameLine(0, 0);
-		}
-		ImGui::TextUnformatted(fmt::format("{:.3f} ms", et.totalTime).c_str());
-
-		if (showPasses) {
-			ImGui::PopStyleColor();
-		}
-
-		if (showPasses) {
-			for (size_t j = 0; j < et.passTimings.size(); ++j) {
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn();
-
-				ImGui::Indent(20);
-
-				float fontHeight = ImGui::GetFont()->FontSize;
-				std::string time = fmt::format("{:.3f} ms", et.passTimings[j]);
-				// 手动计算布局
-				// 运行到此处时还无法确定是否需要滚动条，这里始终减去滚动条的宽度，否则展开时可能会有一帧的跳跃
-				float descWrap = maxWindowWidth - ImGui::CalcTextSize(time.c_str()).x - ImGui::GetStyle().WindowPadding.x - ImGui::GetStyle().ScrollbarSize - ImGui::GetStyle().CellPadding.x * 2;
-				float descHeight = ImGui::CalcTextSize(et.desc->passes[j].desc.c_str(), nullptr, false, descWrap - ImGui::GetCursorPos().x - ImGui::CalcTextSize("■").x - 3).y;
-
-				ImGui::PushStyleColor(ImGuiCol_Text, (ImU32)colors[j]);
-				if (descHeight >= fontHeight * 2) {
-					// 不知为何 SetCursorPos 不起作用
-					// 所以这里使用占位竖直居中颜色框
-					ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
-					ImGui::BeginGroup();
-					ImGui::Dummy(ImVec2(0, (descHeight - fontHeight) / 2));
-					ImGui::TextUnformatted("■");
-					ImGui::EndGroup();
-					ImGui::PopStyleVar();
-				} else {
-					ImGui::TextUnformatted("■");
-				}
-
-				ImGui::PopStyleColor();
-				ImGui::SameLine(0, 3);
-
-				ImGui::PushTextWrapPos(descWrap);
-				ImGui::TextUnformatted(et.desc->passes[j].desc.c_str());
-				ImGui::PopTextWrapPos();
-				ImGui::Unindent(20);
-
-				ImGui::SameLine(0, 0);
-				ImGui::Selectable("", false, ImGuiSelectableFlags_SpanAllColumns, ImVec2(0, descHeight));
-				if (ImGui::IsItemHovered()) {
-					result = (int)j;
-				}
-
-				ImGui::TableNextColumn();
-				// 描述过长导致换行时竖直居中时间
-				if (descHeight >= fontHeight * 2) {
-					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (descHeight - fontHeight) / 2);
-				}
-
-				if (et.passTimings[j] < 10) {
-					ImGui::Dummy(ImVec2(rightAlignSpace, 0));
-					ImGui::SameLine(0, 0);
-				}
-				ImGui::TextUnformatted(time.c_str());
-			}
-		}
-	} else {
-		if (et.totalTime < 10) {
-			ImGui::Dummy(ImVec2(rightAlignSpace, 0));
-			ImGui::SameLine(0, 0);
-		}
-		ImGui::TextUnformatted(fmt::format("{:.3f} ms", et.totalTime).c_str());
-	}
-
-	return result;
-}
-
-static void DrawTimelineItem(ImU32 color, float dpiScale, std::string_view name,
-	float time, float effectsTotalTime, bool selected = false) {
-	ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, color);
-	ImGui::PushStyleColor(ImGuiCol_HeaderActive, color);
-	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, color);
-	ImGui::PushStyleColor(ImGuiCol_Header, color);
-	ImGui::Selectable("", selected);
-	ImGui::PopStyleColor(3);
-
-	if (ImGui::IsItemHovered() || ImGui::IsItemClicked()) {
-		std::string content = fmt::format("{}\n{:.3f} ms\n{}%", name, time, std::lroundf(time / effectsTotalTime * 100));
-		ImGuiImpl::Tooltip(content.c_str(), 500 * dpiScale);
-	}
-
-	// 空间足够时显示文字
-	std::string text;
-	if (selected) {
-		text = fmt::format("{}%", std::lroundf(time / effectsTotalTime * 100));
-	} else {
-		text.assign(name);
-	}
-	
-	float textWidth = ImGui::CalcTextSize(text.c_str()).x;
-	float itemWidth = ImGui::GetItemRectSize().x;
-	float itemSpacing = ImGui::GetStyle().ItemSpacing.x;
-	if (itemWidth - (selected ? 0 : itemSpacing) > textWidth + 4) {
-		ImGui::SameLine(0, 0);
-		ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (itemWidth - textWidth - itemSpacing) / 2);
-		ImGui::TextUnformatted(text.c_str());
-	}
 }
 
 // 自定义提示
@@ -666,10 +759,10 @@ static void MyPlotLines(float(*values_getter)(void* data, int idx), void* data, 
 	int v_idx = (int)(t * values_count);
 	float v0 = values_getter(data, (v_idx + values_offset) % values_count);
 
-	ImGuiImpl::Tooltip(fmt::format("{:.3f}", v0).c_str());
+	ImGuiImpl::Tooltip(fmt::format("{:.1f}", v0).c_str());
 }
 
-void OverlayDrawer::_DrawUI() {
+void OverlayDrawer::_DrawUI() noexcept {
 	auto& settings = MagApp::Get().GetOptions();
 	auto& renderer = MagApp::Get().GetRenderer();
 	auto& gpuTimer = renderer.GetGPUTimer();
@@ -684,7 +777,8 @@ void OverlayDrawer::_DrawUI() {
 	static float initPosX = Win32Utils::GetSizeOfRect(MagApp::Get().GetRenderer().GetOutputRect()).cx - maxWindowWidth;
 	ImGui::SetNextWindowPos(ImVec2(initPosX, 20), ImGuiCond_FirstUseEver);
 
-	if (!ImGui::Begin("Profiler", nullptr, ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize)) {
+	std::string profilerStr = _GetResourceString(L"Overlay_Profiler");
+	if (!ImGui::Begin(profilerStr.c_str(), nullptr, ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize)) {
 		ImGui::End();
 		return;
 	}
@@ -692,9 +786,11 @@ void OverlayDrawer::_DrawUI() {
 	// 始终为滚动条预留空间
 	ImGui::PushTextWrapPos(maxWindowWidth - ImGui::GetStyle().WindowPadding.x - ImGui::GetStyle().ScrollbarSize);
 	ImGui::TextUnformatted(StrUtils::Concat("GPU: ", _hardwareInfo.gpuName).c_str());
-	ImGui::TextUnformatted(StrUtils::Concat("CPU: ", _hardwareInfo.cpuName).c_str());
-	ImGui::TextUnformatted(StrUtils::Concat("VSync: ", settings.IsVSync() ? "ON" : "OFF").c_str());
-	ImGui::TextUnformatted(StrUtils::Concat("Capture Method: ", MagApp::Get().GetFrameSource().GetName()).c_str());
+	const std::string& vSyncStr = _GetResourceString(L"Overlay_Profiler_VSync");
+	const std::string& stateStr = _GetResourceString(settings.IsVSync() ? L"ToggleSwitch/OnContent" : L"ToggleSwitch/OffContent");
+	ImGui::TextUnformatted(StrUtils::Concat(vSyncStr, ": ", stateStr).c_str());
+	const std::string& captureMethodStr = _GetResourceString(L"Overlay_Profiler_CaptureMethod");
+	ImGui::TextUnformatted(StrUtils::Concat(captureMethodStr.c_str(), ": ", MagApp::Get().GetFrameSource().GetName()).c_str());
 	ImGui::PopTextWrapPos();
 
 	ImGui::Spacing();
@@ -710,10 +806,22 @@ void OverlayDrawer::_DrawUI() {
 	_validFrames = std::min(_validFrames + 1, nSamples);
 
 	// 帧率统计，支持在渲染时间和 FPS 间切换
-	if (ImGui::CollapsingHeader("Frame Statistics", ImGuiTreeNodeFlags_DefaultOpen)) {
-		static bool showFPS = true;
+	const std::string& frameStatisticsStr = _GetResourceString(L"Overlay_Profiler_FrameStatistics");
+	if (ImGui::CollapsingHeader(frameStatisticsStr.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+		static bool showFrameRates = true;
 
-		if (showFPS) {
+		ImGui::Spacing();
+		const std::string& buttonStr = _GetResourceString(showFrameRates
+			? L"Overlay_Profiler_FrameStatistics_SwitchToFrameTimings"
+			: L"Overlay_Profiler_FrameStatistics_SwitchToFrameRates");
+		if (ImGui::Button(buttonStr.c_str())) {
+			showFrameRates = !showFrameRates;
+		}
+		ImGui::Spacing();
+
+		ImGui::PushFont(_fontMonoNumbers);
+
+		if (showFrameRates) {
 			float totalTime = 0;
 			float minTime = FLT_MAX;
 			float minTime2 = FLT_MAX;
@@ -740,7 +848,7 @@ void OverlayDrawer::_DrawUI() {
 			MyPlotLines([](void* data, int idx) {
 				float time = (*(std::deque<float>*)data)[idx];
 				return time < 1e-6 ? 0 : 1000 / time;
-			}, &_frameTimes, (int)_frameTimes.size(), 0, fmt::format("avg: {:.3f} FPS", _validFrames * 1000 / totalTime).c_str(), 0, maxFPS, ImVec2(250 * _dpiScale, 80 * _dpiScale));
+			}, &_frameTimes, (int)_frameTimes.size(), 0, fmt::format("avg: {:.1f} FPS", _validFrames * 1000 / totalTime).c_str(), 0, maxFPS, ImVec2(250 * _dpiScale, 80 * _dpiScale));
 		} else {
 			float totalTime = 0;
 			float maxTime = 0;
@@ -764,23 +872,20 @@ void OverlayDrawer::_DrawUI() {
 			MyPlotLines([](void* data, int idx) {
 				return (*(std::deque<float>*)data)[idx];
 			}, &_frameTimes, (int)_frameTimes.size(), 0,
-				fmt::format("avg: {:.3f} ms", totalTime / _validFrames).c_str(),
+				fmt::format("avg: {:.1f} ms", totalTime / _validFrames).c_str(),
 				0, maxTime2 * 1.7f, ImVec2(250 * _dpiScale, 80 * _dpiScale));
 		}
 
-		ImGui::Spacing();
-
-		if (ImGui::Button(showFPS ? "Switch to timings" : "Switch to FPS")) {
-			showFPS = !showFPS;
-		}
+		ImGui::PopFont();
 	}
 
 	ImGui::Spacing();
-	if (ImGui::CollapsingHeader("Timings", ImGuiTreeNodeFlags_DefaultOpen)) {
+	const std::string& timingsStr = _GetResourceString(L"Overlay_Profiler_Timings");
+	if (ImGui::CollapsingHeader(timingsStr.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
 		const auto& gpuTimings = gpuTimer.GetGPUTimings();
 		const UINT nEffect = renderer.GetEffectCount();
 		
-		SmallVector<EffectTimings, 4> effectTimings(nEffect);
+		SmallVector<_EffectTimings, 4> effectTimings(nEffect);
 
 		{
 			UINT idx = 0;
@@ -810,7 +915,11 @@ void OverlayDrawer::_DrawUI() {
 			for (const auto& et : effectTimings) {
 				// 某个效果有多个通道，显示切换按钮
 				if (et.passTimings.size() > 1) {
-					if (ImGui::Button(showPasses ? "Switch to effects" : "Switch to passes")) {
+					ImGui::Spacing();
+					const std::string& buttonStr = _GetResourceString(showPasses
+						? L"Overlay_Profiler_Timings_SwitchToEffects"
+						: L"Overlay_Profiler_Timings_SwitchToPasses");
+					if (ImGui::Button(buttonStr.c_str())) {
 						showPasses = !showPasses;
 					}
 					break;
@@ -879,7 +988,7 @@ void OverlayDrawer::_DrawUI() {
 						ImGui::TableNextRow();
 
 						UINT i = 0;
-						for (const EffectTimings& et : effectTimings) {
+						for (const _EffectTimings& et : effectTimings) {
 							for (UINT j = 0, end = (UINT)et.passTimings.size(); j < end; ++j) {
 								if (et.passTimings[j] < 1e-5f) {
 									continue;
@@ -896,7 +1005,7 @@ void OverlayDrawer::_DrawUI() {
 									name = StrUtils::Concat(GetEffectDisplayName(et.desc), "/", et.desc->passes[j].desc);
 								}
 
-								DrawTimelineItem(colors[i], _dpiScale, name, et.passTimings[j], effectsTotalTime, selectedIdx == (int)i);
+								_DrawTimelineItem(colors[i], _dpiScale, name, et.passTimings[j], effectsTotalTime, selectedIdx == (int)i);
 
 								++i;
 							}
@@ -927,7 +1036,7 @@ void OverlayDrawer::_DrawUI() {
 							}
 
 							ImGui::TableNextColumn();
-							DrawTimelineItem(colors[i], _dpiScale, GetEffectDisplayName(et.desc), et.totalTime, effectsTotalTime, selectedIdx == (int)i);
+							_DrawTimelineItem(colors[i], _dpiScale, GetEffectDisplayName(et.desc), et.totalTime, effectsTotalTime, selectedIdx == (int)i);
 						}
 
 						ImGui::EndTable();
@@ -964,7 +1073,7 @@ void OverlayDrawer::_DrawUI() {
 
 			if (nEffect == 1) {
 				const auto& et = effectTimings[0];
-				int hovered = DrawEffectTimings(et, true, maxWindowWidth, colors, true);
+				int hovered = _DrawEffectTimings(et, true, maxWindowWidth, colors, true);
 				if (hovered >= 0) {
 					selectedIdx = hovered;
 				}
@@ -982,7 +1091,7 @@ void OverlayDrawer::_DrawUI() {
 						idx += et.passTimings.size();
 					}
 
-					int hovered = DrawEffectTimings(et, showPasses, maxWindowWidth, colorSpan, false);
+					int hovered = _DrawEffectTimings(et, showPasses, maxWindowWidth, colorSpan, false);
 					if (hovered >= 0) {
 						selectedIdx = idxBegin + hovered;
 					}
@@ -1001,9 +1110,10 @@ void OverlayDrawer::_DrawUI() {
 
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn();
-				ImGui::TextUnformatted("Total");
+				const std::string& totalStr = _GetResourceString(L"Overlay_Profiler_Timings_Total");
+				ImGui::TextUnformatted(totalStr.c_str());
 				ImGui::TableNextColumn();
-				ImGui::TextUnformatted(fmt::format("{:.3f} ms", effectsTotalTime).c_str());
+				DrawTextWithFont(fmt::format("{:.3f} ms", effectsTotalTime).c_str(), _fontMonoNumbers);
 
 				ImGui::EndTable();
 			}
@@ -1014,16 +1124,13 @@ void OverlayDrawer::_DrawUI() {
 	ImGui::End();
 }
 
-void OverlayDrawer::_RetrieveHardwareInfo() {
+void OverlayDrawer::_RetrieveHardwareInfo() noexcept {
 	DXGI_ADAPTER_DESC desc{};
 	HRESULT hr = MagApp::Get().GetDeviceResources().GetGraphicsAdapter()->GetDesc(&desc);
 	_hardwareInfo.gpuName = SUCCEEDED(hr) ? StrUtils::UTF16ToUTF8(desc.Description) : "UNAVAILABLE";
-
-	std::string cpuName = GetCPUName();
-	_hardwareInfo.cpuName = !cpuName.empty() ? std::move(cpuName) : "UNAVAILABLE";
 }
 
-void OverlayDrawer::_EnableSrcWnd(bool enable) {
+void OverlayDrawer::_EnableSrcWnd(bool enable) noexcept {
 	HWND hwndSrc = MagApp::Get().GetHwndSrc();
 	if (!_isSrcMainWnd) {
 		// 如果源窗口是 Magpie 主窗口会卡死
@@ -1032,6 +1139,16 @@ void OverlayDrawer::_EnableSrcWnd(bool enable) {
 	if (enable) {
 		SetForegroundWindow(hwndSrc);
 	}
+}
+
+const std::string& OverlayDrawer::_GetResourceString(const std::wstring_view& key) noexcept {
+	static phmap::flat_hash_map<std::wstring, std::string> cache;
+
+	if (auto it = cache.find(key); it != cache.end()) {
+		return it->second;
+	}
+
+	return cache[key] = StrUtils::UTF16ToUTF8(_resourceLoader.GetString(key));
 }
 
 }

@@ -56,7 +56,7 @@
     <ClInclude Include="OverlayDrawer.h">
       <Filter>Overlay</Filter>
     </ClInclude>
-    <ClInclude Include="imgui_impl_dx11.h">
+    <ClInclude Include="ImGuiBackend.h">
       <Filter>Overlay</Filter>
     </ClInclude>
     <ClInclude Include="ImGuiImpl.h">
@@ -84,6 +84,15 @@
       <Filter>Helpers</Filter>
     </ClInclude>
     <ClInclude Include="EffectHelper.h">
+      <Filter>Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper.h">
+      <Filter>Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiFontsCacheManager.h">
+      <Filter>Overlay</Filter>
+    </ClInclude>
+    <ClInclude Include="YasHelper.h">
       <Filter>Helpers</Filter>
     </ClInclude>
   </ItemGroup>
@@ -118,7 +127,7 @@
     <ClCompile Include="OverlayDrawer.cpp">
       <Filter>Overlay</Filter>
     </ClCompile>
-    <ClCompile Include="imgui_impl_dx11.cpp">
+    <ClCompile Include="ImGuiBackend.cpp">
       <Filter>Overlay</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiImpl.cpp">
@@ -136,11 +145,12 @@
     <ClCompile Include="WindowHelper.cpp">
       <Filter>Helpers</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <CopyFileToFolders Include="NotoSansSC-Regular.otf">
-      <Filter>资源文件</Filter>
-    </CopyFileToFolders>
+    <ClCompile Include="ImGuiHelper.cpp">
+      <Filter>Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiFontsCacheManager.cpp">
+      <Filter>Overlay</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Magpie.Core.rc">
@@ -149,5 +159,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="conanfile.txt" />
   </ItemGroup>
 </Project>

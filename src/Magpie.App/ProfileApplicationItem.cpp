@@ -21,7 +21,7 @@ using namespace ::Magpie::Core;
 
 namespace winrt::Magpie::App::implementation {
 
-static void LaunchPackagedApp(const ProfileApplication& profile) {
+static void LaunchPackagedApp(const ProfileApplication& application) noexcept {
 	// 关于启动打包应用的讨论：
 	// https://github.com/microsoft/WindowsAppSDK/issues/2856#issuecomment-1224409948
 	// 使用 CLSCTX_LOCAL_SERVER 以在独立的进程中启动应用
@@ -40,7 +40,7 @@ static void LaunchPackagedApp(const ProfileApplication& profile) {
 	}
 
 	DWORD procId;
-	hr = aam->ActivateApplication(profile.pathRule.c_str(), profile.launchParameters.c_str(), AO_NONE, &procId);
+	hr = aam->ActivateApplication(application.pathRule.c_str(), application.launchParameters.c_str(), AO_NONE, &procId);
 	if (FAILED(hr)) {
 		Logger::Get().ComError("IApplicationActivationManager::ActivateApplication 失败", hr);
 		return;

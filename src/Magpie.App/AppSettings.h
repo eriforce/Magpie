@@ -50,8 +50,10 @@ struct _AppSettingsData {
 	bool _isAlwaysRunAsAdmin = false;
 	bool _isDebugMode = false;
 	bool _isDisableEffectCache = false;
+	bool _isDisableFontCache = false;
 	bool _isSaveEffectSources = false;
 	bool _isWarningsAreErrors = false;
+	bool _isAllowScalingMaximized = false;
 	bool _isSimulateExclusiveFullscreen = false;
 	bool _isInlineParams = false;
 	bool _isShowTrayIcon = true;
@@ -201,6 +203,15 @@ public:
 		SaveAsync();
 	}
 
+	bool IsDisableFontCache() const noexcept {
+		return _isDisableFontCache;
+	}
+
+	void IsDisableFontCache(bool value) noexcept {
+		_isDisableFontCache = value;
+		SaveAsync();
+	}
+
 	bool IsSaveEffectSources() const noexcept {
 		return _isSaveEffectSources;
 	}
@@ -216,6 +227,15 @@ public:
 
 	void IsWarningsAreErrors(bool value) noexcept {
 		_isWarningsAreErrors = value;
+		SaveAsync();
+	}
+
+	bool IsAllowScalingMaximized() const noexcept {
+		return _isAllowScalingMaximized;
+	}
+
+	void IsAllowScalingMaximized(bool value) noexcept {
+		_isAllowScalingMaximized = value;
 		SaveAsync();
 	}
 
