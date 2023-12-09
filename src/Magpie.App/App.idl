@@ -21,7 +21,7 @@
 #include "NewApplicationViewModel.idl"
 #include "ProfileApplicationItem.idl"
 #include "AboutViewModel.idl"
-#include "MainPage.idl"
+#include "RootPage.idl"
 #include "AboutPage.idl"
 #include "HomePage.idl"
 #include "ScalingConfigurationPage.idl"
@@ -45,7 +45,8 @@ namespace Magpie.App {
 	};
 
 	struct StartUpOptions {
-		Windows.Foundation.Rect MainWndRect;
+		Windows.Foundation.Point MainWindowCenter;
+		Windows.Foundation.Size MainWindowSizeInDips;
 		Boolean IsError;
 		Boolean IsWndMaximized;
 		Boolean IsNeedElevated;
@@ -65,7 +66,7 @@ namespace Magpie.App {
 		UInt64 HwndMain;
 		event Windows.Foundation.EventHandler<UInt64> HwndMainChanged;
 
-		MainPage MainPage;
+		RootPage RootPage;
 
 		void Quit();
 		void Restart();

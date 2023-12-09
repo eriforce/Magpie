@@ -47,7 +47,7 @@ private:
 
 	event<PropertyChangedEventHandler> _propertyChangedEvent;
 
-	fire_and_forget _LoadIcon();
+	fire_and_forget _LoadIcon(FrameworkElement const& rootPage);
 
 	uint32_t _profileIdx = 0;
 	uint32_t _applicationIdx = 0;
@@ -58,6 +58,9 @@ private:
 	bool _exists = false;
 	Controls::IconElement _icon{ nullptr };
 
+	RootPage::ActualThemeChanged_revoker _themeChangedRevoker;
+	Windows::Graphics::Display::DisplayInformation _displayInformation{ nullptr };
+	Windows::Graphics::Display::DisplayInformation::DpiChanged_revoker _dpiChangedRevoker;
 	WinRTUtils::EventRevoker _applicationRemovedRevoker;
 };
 

@@ -4,10 +4,13 @@
 #include "Win32Utils.h"
 #include "ThemeHelper.h"
 #include "XamlApp.h"
+#include <ShellScalingApi.h>
+
+#pragma comment(lib, "Shcore.lib")
 
 namespace Magpie {
 
-bool MainWindow::Create(HINSTANCE hInstance, const RECT& windowRect, bool isMaximized) noexcept {
+bool MainWindow::Create(HINSTANCE hInstance, winrt::Point windowCenter, winrt::Size windowSizeInDips, bool isMaximized) noexcept {
 	static const int _ = [](HINSTANCE hInstance) {
 		WNDCLASSEXW wcex{};
 		wcex.cbSize = sizeof(wcex);
@@ -27,24 +30,13 @@ bool MainWindow::Create(HINSTANCE hInstance, const RECT& windowRect, bool isMaxi
 		return 0;
 	}(hInstance);
 
-	// Win11 22H2 中为了使用 Mica 背景需指定 WS_EX_NOREDIRECTIONBITMAP
-	CreateWindowEx(
-		Win32Utils::GetOSVersion().Is22H2OrNewer() ? WS_EX_NOREDIRECTIONBITMAP : 0,
-		CommonSharedConstants::MAIN_WINDOW_CLASS_NAME,
-		L"Magpie",
-		WS_OVERLAPPEDWINDOW,
-		windowRect.left, windowRect.top, windowRect.right, windowRect.bottom,
-		NULL,
-		NULL,
-		hInstance,
-		this
-	);
+	const auto& [posToSet, sizeToSet] = _CreateWindow(hInstance, windowCenter, windowSizeInDips);
 
 	if (!_hWnd) {
 		return false;
 	}
 
-	_SetContent(winrt::Magpie::App::MainPage());
+	_SetContent(winrt::Magpie::App::RootPage());
 
 	_content.ActualThemeChanged([this](winrt::FrameworkElement const&, winrt::IInspectable const&) {
 		_UpdateTheme();
@@ -57,8 +49,10 @@ bool MainWindow::Create(HINSTANCE hInstance, const RECT& windowRect, bool isMaxi
 
 	// 1. 设置初始 XAML Islands 窗口的尺寸
 	// 2. 刷新窗口边框
-	// 3. 防止窗口显示时背景闪烁: https://stackoverflow.com/questions/69715610/how-to-initialize-the-background-color-of-win32-app-to-something-other-than-whit
-	SetWindowPos(_hWnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_FRAMECHANGED);
+	// 3. 无法获知 DPI 的情况下 _CreateWindow 创建的窗口尺寸为零，在这里延后设置窗口位置
+	// 4. 防止窗口显示时背景闪烁: https://stackoverflow.com/questions/69715610/how-to-initialize-the-background-color-of-win32-app-to-something-other-than-whit
+	SetWindowPos(_hWnd, NULL, posToSet.x, posToSet.y, sizeToSet.cx, sizeToSet.cy,
+		(sizeToSet.cx == 0 ? (SWP_NOMOVE | SWP_NOSIZE) : 0) | SWP_FRAMECHANGED | SWP_NOACTIVATE | SWP_NOCOPYBITS);
 
 	// Xaml 控件加载完成后显示主窗口
 	_content.Loaded([this, isMaximized](winrt::IInspectable const&, winrt::RoutedEventArgs const&) {
@@ -123,6 +117,20 @@ bool MainWindow::Create(HINSTANCE hInstance, const RECT& windowRect, bool isMaxi
 	);
 	SetLayeredWindowAttributes(_hwndTitleBar, 0, 255, LWA_ALPHA);
 
+	if (Win32Utils::GetOSVersion().IsWin11()) {
+		// 如果鼠标正位于一个按钮上，贴靠布局弹窗会出现在按钮下方。我们利用这个特性来修正贴靠布局弹窗的位置
+		_hwndMaximizeButton = CreateWindow(
+			L"BUTTON",
+			L"",
+			WS_VISIBLE | WS_CHILD | WS_DISABLED | BS_OWNERDRAW,
+			0, 0, 0, 0,
+			_hwndTitleBar,
+			NULL,
+			hInstance,
+			NULL
+		);
+	}
+
 	_content.TitleBar().SizeChanged([this](winrt::IInspectable const&, winrt::SizeChangedEventArgs const&) {
 		_ResizeTitleBarWindow();
 	});
@@ -152,8 +160,8 @@ LRESULT MainWindow::_MessageHandler(UINT msg, WPARAM wParam, LPARAM lParam) noex
 		// 设置窗口最小尺寸
 		MINMAXINFO* mmi = (MINMAXINFO*)lParam;
 		mmi->ptMinTrackSize = { 
-			std::lround(550 * _currentDpi / double(USER_DEFAULT_SCREEN_DPI)),
-			std::lround(300 * _currentDpi / double(USER_DEFAULT_SCREEN_DPI))
+			std::lroundf(550 * _currentDpi / float(USER_DEFAULT_SCREEN_DPI)),
+			std::lroundf(300 * _currentDpi / float(USER_DEFAULT_SCREEN_DPI))
 		};
 		return 0;
 	}
@@ -214,6 +222,115 @@ LRESULT MainWindow::_MessageHandler(UINT msg, WPARAM wParam, LPARAM lParam) noex
 	return base_type::_MessageHandler(msg, wParam, lParam);
 }
 
+std::pair<POINT, SIZE> MainWindow::_CreateWindow(HINSTANCE hInstance, winrt::Point windowCenter, winrt::Size windowSizeInDips) noexcept {
+	POINT windowPos = { CW_USEDEFAULT,CW_USEDEFAULT };
+	SIZE windowSize{};
+
+	// windowSizeInDips 小于零表示默认位置和尺寸
+	if (windowSizeInDips.Width > 0) {
+		// 检查窗口中心点的 DPI，根据我的测试，创建窗口时 Windows 使用窗口中心点确定 DPI。
+		// 如果窗口中心点不在任何屏幕上，则在默认位置启动，让调用者设置窗口尺寸。
+		const HMONITOR hMon = MonitorFromPoint(
+			{ std::lroundf(windowCenter.X),std::lroundf(windowCenter.Y) },
+			MONITOR_DEFAULTTONULL
+		);
+		if (hMon) {
+			UINT dpi = USER_DEFAULT_SCREEN_DPI;
+			GetDpiForMonitor(hMon, MDT_EFFECTIVE_DPI, &dpi, &dpi);
+
+			const float dpiFactor = dpi / float(USER_DEFAULT_SCREEN_DPI);
+			const winrt::Size windowSizeInPixels = {
+				windowSizeInDips.Width * dpiFactor,
+				windowSizeInDips.Height * dpiFactor
+			};
+
+			windowSize.cx = std::lroundf(windowSizeInPixels.Width);
+			windowSize.cy = std::lroundf(windowSizeInPixels.Height);
+
+			MONITORINFO mi{ sizeof(mi) };
+			GetMonitorInfo(hMon, &mi);
+
+			// 确保启动位置在屏幕工作区内。不允许启动时跨越多个屏幕。
+			if (windowSize.cx <= mi.rcWork.right - mi.rcWork.left && windowSize.cy <= mi.rcWork.bottom - mi.rcWork.top) {
+				windowPos.x = std::lroundf(windowCenter.X - windowSizeInPixels.Width / 2);
+				windowPos.x = std::clamp(windowPos.x, mi.rcWork.left, mi.rcWork.right - windowSize.cx);
+
+				windowPos.y = std::lroundf(windowCenter.Y - windowSizeInPixels.Height / 2);
+				windowPos.y = std::clamp(windowPos.y, mi.rcWork.top, mi.rcWork.bottom - windowSize.cy);
+			} else {
+				// 屏幕工作区无法容纳窗口则使用默认窗口尺寸
+				windowSize = {};
+				windowSizeInDips.Width = -1.0f;
+			}
+		}
+	}
+
+	// Win11 22H2 中为了使用 Mica 背景需指定 WS_EX_NOREDIRECTIONBITMAP
+	// windowSize 可能为零，并返回窗口尺寸给调用者
+	CreateWindowEx(
+		Win32Utils::GetOSVersion().Is22H2OrNewer() ? WS_EX_NOREDIRECTIONBITMAP : 0,
+		CommonSharedConstants::MAIN_WINDOW_CLASS_NAME,
+		L"Magpie",
+		WS_OVERLAPPEDWINDOW,
+		windowPos.x,
+		windowPos.y,
+		windowSize.cx,
+		windowSize.cy,
+		NULL,
+		NULL,
+		hInstance,
+		this
+	);
+
+	if (windowSize.cx == 0) {
+		const HMONITOR hMon = MonitorFromWindow(_hWnd, MONITOR_DEFAULTTONEAREST);
+
+		MONITORINFO mi{ sizeof(mi) };
+		GetMonitorInfo(hMon, &mi);
+
+		const float dpiFactor = _currentDpi / float(USER_DEFAULT_SCREEN_DPI);
+		const winrt::Size workingAreaSizeInDips = {
+			(mi.rcWork.right - mi.rcWork.left) / dpiFactor,
+			(mi.rcWork.bottom - mi.rcWork.top) / dpiFactor
+		};
+
+		// 确保启动尺寸小于屏幕工作区
+		if (windowSizeInDips.Width <= 0 ||
+			windowSizeInDips.Width > workingAreaSizeInDips.Width ||
+			windowSizeInDips.Height > workingAreaSizeInDips.Height) {
+			// 默认尺寸
+			static constexpr winrt::Size DEFAULT_SIZE{ 980.0f, 690.0f };
+
+			windowSizeInDips = DEFAULT_SIZE;
+
+			if (windowSizeInDips.Width > workingAreaSizeInDips.Width ||
+				windowSizeInDips.Height > workingAreaSizeInDips.Height) {
+				// 屏幕太小无法容纳默认尺寸
+				windowSizeInDips.Width = workingAreaSizeInDips.Width * 0.8f;
+				windowSizeInDips.Height = windowSizeInDips.Width * DEFAULT_SIZE.Height / DEFAULT_SIZE.Width;
+
+				if (windowSizeInDips.Height > workingAreaSizeInDips.Height) {
+					windowSizeInDips.Height = workingAreaSizeInDips.Height * 0.8f;
+					windowSizeInDips.Width = windowSizeInDips.Height * DEFAULT_SIZE.Width / DEFAULT_SIZE.Height;
+				}
+			}
+		}
+
+		windowSize.cx = std::lroundf(windowSizeInDips.Width * dpiFactor);
+		windowSize.cy = std::lroundf(windowSizeInDips.Height * dpiFactor);
+
+		// 确保启动位置在屏幕工作区内
+		RECT targetRect;
+		GetWindowRect(_hWnd, &targetRect);
+		windowPos.x = std::clamp(targetRect.left, mi.rcWork.left, mi.rcWork.right - windowSize.cx);
+		windowPos.y = std::clamp(targetRect.top, mi.rcWork.top, mi.rcWork.bottom - windowSize.cy);
+
+		return std::make_pair(windowPos, windowSize);
+	} else {
+		return {};
+	}
+}
+
 void MainWindow::_UpdateTheme() {
 	XamlWindowT::_SetTheme(_content.ActualTheme() == winrt::ElementTheme::Dark);
 }
@@ -233,6 +350,11 @@ LRESULT MainWindow::_TitleBarWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
 
 LRESULT MainWindow::_TitleBarMessageHandler(UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
 	switch (msg) {
+	case WM_CTLCOLORBTN:
+	{
+		// 使原生按钮控件透明，虽然整个标题栏窗口都是不可见的
+		return NULL;
+	}
 	case WM_NCHITTEST:
 	{
 		POINT cursorPos{ GET_X_LPARAM(lParam),GET_Y_LPARAM(lParam) };
@@ -427,15 +549,32 @@ void MainWindow::_ResizeTitleBarWindow() noexcept {
 	const float dpiScale = _currentDpi / float(USER_DEFAULT_SCREEN_DPI);
 
 	// 将标题栏窗口置于 XAML Islands 窗口上方
+	const int titleBarWidth = (int)std::ceilf(rect.Width * dpiScale);
 	SetWindowPos(
 		_hwndTitleBar,
 		HWND_TOP,
 		(int)std::floorf(rect.X * dpiScale),
 		(int)std::floorf(rect.Y * dpiScale) + _GetTopBorderHeight(),
-		(int)std::ceilf(rect.Width * dpiScale),
+		titleBarWidth,
 		(int)std::floorf(rect.Height * dpiScale + 1),	// 不知为何，直接向上取整有时无法遮盖 TitleBarControl
 		SWP_SHOWWINDOW
 	);
+
+	if (_hwndMaximizeButton) {
+		static const float captionButtonHeightInDips = [&]() {
+			return titleBar.CaptionButtons().CaptionButtonSize().Height;
+		}();
+
+		const int captionButtonHeightInPixels = (int)std::ceilf(captionButtonHeightInDips * dpiScale);
+
+		// 确保原生按钮和标题栏按钮高度相同
+		MoveWindow(_hwndMaximizeButton, 0, 0, titleBarWidth, captionButtonHeightInPixels, FALSE);
+	}
+
+	// 设置标题栏窗口的最大化样式，这样才能展示正确的文字提示
+	LONG_PTR style = GetWindowLongPtr(_hwndTitleBar, GWL_STYLE);
+	SetWindowLongPtr(_hwndTitleBar, GWL_STYLE,
+		_isMaximized ? style | WS_MAXIMIZE : style & ~WS_MAXIMIZE);
 }
 
 }

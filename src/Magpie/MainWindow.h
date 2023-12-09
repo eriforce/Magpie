@@ -4,10 +4,10 @@
 
 namespace Magpie {
 
-class MainWindow : public XamlWindowT<MainWindow, winrt::Magpie::App::MainPage> {
+class MainWindow : public XamlWindowT<MainWindow, winrt::Magpie::App::RootPage> {
 	friend class base_type;
 public:
-	bool Create(HINSTANCE hInstance, const RECT& windowRect, bool isMaximized) noexcept;
+	bool Create(HINSTANCE hInstance, winrt::Point windowCenter, winrt::Size windowSizeInDips, bool isMaximized) noexcept;
 
 	void Show() const noexcept;
 
@@ -15,6 +15,8 @@ protected:
 	LRESULT _MessageHandler(UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
 
 private:
+	std::pair<POINT, SIZE> _CreateWindow(HINSTANCE hInstance, winrt::Point windowCenter, winrt::Size windowSizeInDips) noexcept;
+
 	void _UpdateTheme();
 
 	static LRESULT CALLBACK _TitleBarWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
@@ -24,6 +26,7 @@ private:
 	void _ResizeTitleBarWindow() noexcept;
 
 	HWND _hwndTitleBar = NULL;
+	HWND _hwndMaximizeButton = NULL;
 	bool _trackingMouse = false;
 };
 

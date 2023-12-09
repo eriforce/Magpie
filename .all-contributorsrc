@@ -8,7 +8,7 @@
   "contributors": [
     {
       "login": "Blinue",
-      "name": "刘旭",
+      "name": "Xu",
       "avatar_url": "https://avatars.githubusercontent.com/u/34770031?v=4",
       "profile": "https://github.com/Blinue",
       "contributions": [
@@ -208,6 +208,33 @@
       "name": "Zoommod",
       "avatar_url": "https://avatars.githubusercontent.com/u/71239440?v=4",
       "profile": "https://github.com/Zoommod",
+      "contributions": [
+        "translation"
+      ]
+    },
+    {
+      "login": "fil08",
+      "name": "fil08",
+      "avatar_url": "https://avatars.githubusercontent.com/u/125665523?v=4",
+      "profile": "https://github.com/fil08",
+      "contributions": [
+        "translation"
+      ]
+    },
+    {
+      "login": "IsaiasYang",
+      "name": "攸羚",
+      "avatar_url": "https://avatars.githubusercontent.com/u/20205571?v=4",
+      "profile": "https://github.com/IsaiasYang",
+      "contributions": [
+        "code"
+      ]
+    },
+    {
+      "login": "ohaiibuzzle",
+      "name": "OHaiiBuzzle",
+      "avatar_url": "https://avatars.githubusercontent.com/u/23693150?v=4",
+      "profile": "http://ohaiibuzzle.dev",
       "contributions": [
         "translation"
       ]

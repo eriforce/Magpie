@@ -220,7 +220,7 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Page Include="MainPage.xaml" />
+    <Page Include="RootPage.xaml" />
     <Page Include="HomePage.xaml">
       <Filter>Pages</Filter>
     </Page>
@@ -301,6 +301,24 @@
       <Filter>Strings</Filter>
     </PRIResource>
     <PRIResource Include="Resources.language-pt-BR.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+    <PRIResource Include="Resources.language-it.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+    <PRIResource Include="Resources.language-de.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+    <PRIResource Include="Resources.language-fr.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+    <PRIResource Include="Resources.language-hu.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+    <PRIResource Include="Resources.language-id.resw">
+      <Filter>Strings</Filter>
+    </PRIResource>
+    <PRIResource Include="Resources.language-vi.resw">
       <Filter>Strings</Filter>
     </PRIResource>
   </ItemGroup>

@@ -11,22 +11,23 @@
             <StackPanel ChildrenTransitions="{StaticResource SettingsCardsAnimations}"
                         Orientation="Horizontal"
                         Visibility="{x:Bind ViewModel.IsNotDefaultProfile, Mode=OneTime}">
-                <Button x:Uid="Profile_AddApplication"
-                        x:Name="AddApplicationButton"
+                <Button x:Name="AddApplicationButton"
+                        x:Uid="Profile_AddApplication"
                         Click="AddApplicationButton_Click">
                     <Button.Content>
                         <FontIcon Glyph="&#xE710;" />
                     </Button.Content>
                     <FlyoutBase.AttachedFlyout>
-                        <Flyout x:Name="NewApplicationFlyout" Placement="Right">
+                        <Flyout x:Name="NewApplicationFlyout"
+                                Placement="Right">
                             <Grid>
                                 <ContentControl Grid.RowSpan="2"
-                                                Visibility="{x:Bind NewAppViewModel.IsNoCandidateWindow, Mode=OneWay}"
                                                 MinWidth="240"
                                                 MinHeight="170"
                                                 Margin="10"
                                                 HorizontalContentAlignment="Center"
-                                                VerticalContentAlignment="Center">
+                                                VerticalContentAlignment="Center"
+                                                Visibility="{x:Bind NewAppViewModel.IsNoCandidateWindow, Mode=OneWay}">
                                     <StackPanel Orientation="Vertical"
                                                 Spacing="20">
                                         <FontIcon HorizontalAlignment="Center"
@@ -38,48 +39,48 @@
                                 </ContentControl>
 
                                 <StackPanel Orientation="Vertical"
-                                        Visibility="{x:Bind NewAppViewModel.IsAnyCandidateWindow, Mode=OneWay}">
+                                            Visibility="{x:Bind NewAppViewModel.IsAnyCandidateWindow, Mode=OneWay}">
                                     <TextBlock x:Uid="Profile_AddApplicationFlyout_Title"
-                                           Margin="0,5,0,20"
-                                           FontSize="18"
-                                           FontWeight="SemiBold" />
+                                               Margin="0,5,0,20"
+                                               FontSize="18"
+                                               FontWeight="SemiBold" />
                                     <StackPanel Width="280"
-                                            Orientation="Vertical"
-                                            Spacing="15">
+                                                Orientation="Vertical"
+                                                Spacing="15">
                                         <ComboBox x:Name="CandidateWindowsComboBox"
-                                              x:Uid="Main_NewProfileFlyout_ComboBox"
-                                              Margin="0,0,0,10"
-                                              HorizontalAlignment="Stretch"
-                                              DropDownOpened="ComboBox_DropDownOpened"
-                                              ItemsSource="{x:Bind NewAppViewModel.CandidateWindows, Mode=OneWay}"
-                                              SelectedIndex="{x:Bind NewAppViewModel.CandidateWindowIndex, Mode=TwoWay}">
+                                                  x:Uid="Main_NewProfileFlyout_ComboBox"
+                                                  Margin="0,0,0,10"
+                                                  HorizontalAlignment="Stretch"
+                                                  DropDownOpened="ComboBox_DropDownOpened"
+                                                  ItemsSource="{x:Bind NewAppViewModel.CandidateWindows, Mode=OneWay}"
+                                                  SelectedIndex="{x:Bind NewAppViewModel.CandidateWindowIndex, Mode=TwoWay}">
                                             <ComboBox.ItemTemplate>
                                                 <DataTemplate x:DataType="local:CandidateWindowItem">
                                                     <Grid MaxWidth="450"
-                                                      HorizontalAlignment="Stretch"
-                                                      ColumnSpacing="15">
+                                                          HorizontalAlignment="Stretch"
+                                                          ColumnSpacing="15">
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="Auto" />
                                                             <ColumnDefinition Width="*" />
                                                         </Grid.ColumnDefinitions>
                                                         <ContentPresenter Grid.Column="0"
-                                                                      Content="{x:Bind Icon, Mode=OneWay}" />
+                                                                          Content="{x:Bind Icon, Mode=OneWay}" />
                                                         <TextBlock Grid.Column="1"
-                                                               VerticalAlignment="Center"
-                                                               local:TextBlockHelper.IsAutoTooltip="True"
-                                                               Text="{x:Bind Title, Mode=OneWay}"
-                                                               TextTrimming="CharacterEllipsis" />
+                                                                   VerticalAlignment="Center"
+                                                                   local:TextBlockHelper.IsAutoTooltip="True"
+                                                                   Text="{x:Bind Title, Mode=OneWay}"
+                                                                   TextTrimming="CharacterEllipsis" />
                                                     </Grid>
                                                 </DataTemplate>
                                             </ComboBox.ItemTemplate>
                                         </ComboBox>
                                         <Button x:Uid="Profile_AddApplicationFlyout_Add"
-                                            MinWidth="100"
-                                            Margin="0,15,0,0"
-                                            HorizontalAlignment="Right"
-                                            Click="NewApplicationConfirmButton_Click"
-                                            IsEnabled="{x:Bind NewAppViewModel.IsConfirmButtonEnabled, Mode=OneWay}"
-                                            Style="{StaticResource AccentButtonStyle}" />
+                                                MinWidth="100"
+                                                Margin="0,15,0,0"
+                                                HorizontalAlignment="Right"
+                                                Click="NewApplicationConfirmButton_Click"
+                                                IsEnabled="{x:Bind NewAppViewModel.IsConfirmButtonEnabled, Mode=OneWay}"
+                                                Style="{StaticResource AccentButtonStyle}" />
                                     </StackPanel>
                                 </StackPanel>
                             </Grid>
@@ -240,9 +241,10 @@
                 </local:SettingsCard>
                 <StackPanel ChildrenTransitions="{StaticResource SettingsCardsAnimations}"
                             Orientation="Vertical">
-                    <local:SettingsCard x:Uid="Profile_General_AutoScale"
+                    <local:SettingsCard x:Name="AutoScaleSettingsCard"
+                                        x:Uid="Profile_General_AutoScale"
                                         Margin="0,0,0,2"
-                                        Visibility="{x:Bind ViewModel.IsNotDefaultProfile, Mode=OneTime}">
+                                        x:Load="{x:Bind ViewModel.IsNotDefaultProfile, Mode=OneTime}">
                         <local:SettingsCard.Icon>
                             <FontIcon Glyph="&#xE945;" />
                         </local:SettingsCard.Icon>
@@ -260,9 +262,10 @@
                                           IsOn="{x:Bind ViewModel.Is3DGameMode, Mode=TwoWay}" />
                         </local:SettingsCard.ActionContent>
                     </local:SettingsCard>
-                    <local:SettingsCard x:Uid="Profile_General_Multimonitor"
+                    <local:SettingsCard x:Name="MultimonitorSettingsCard"
+                                        x:Uid="Profile_General_Multimonitor"
                                         Margin="0,2,0,0"
-                                        Visibility="{x:Bind ViewModel.HasMultipleMonitors, Mode=OneTime}">
+                                        x:Load="{x:Bind ViewModel.HasMultipleMonitors, Mode=OneTime}">
                         <local:SettingsCard.Icon>
                             <FontIcon Glyph="&#xf5a9;" />
                         </local:SettingsCard.Icon>
@@ -278,7 +281,8 @@
                     </local:SettingsCard>
                 </StackPanel>
             </local:SettingsGroup>
-            <local:SettingsGroup x:Uid="Profile_Applications" Visibility="{x:Bind ViewModel.IsNotDefaultProfile, Mode=OneTime}">
+            <local:SettingsGroup x:Uid="Profile_Applications"
+                                 Visibility="{x:Bind ViewModel.IsNotDefaultProfile, Mode=OneTime}">
                 <ListView AllowDrop="True"
                           CanReorderItems="True"
                           ItemsSource="{x:Bind ViewModel.Applications, Mode=OneTime}"
@@ -299,7 +303,8 @@
                                     <ContentPresenter Content="{x:Bind Icon, Mode=OneWay}" />
                                 </local:SettingsCard.Icon>
                                 <local:SettingsCard.ActionContent>
-                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <StackPanel Orientation="Horizontal"
+                                                Spacing="4">
                                         <StackPanel.Resources>
                                             <Style BasedOn="{StaticResource DefaultButtonStyle}"
                                                    TargetType="Button">
@@ -310,8 +315,10 @@
                                                 IsEnabled="{x:Bind Exists, Mode=OneTime}">
                                             <Button.Content>
                                                 <StackPanel Orientation="Horizontal">
-                                                    <FontIcon Glyph="&#xE768;" FontSize="14" />
-                                                    <TextBlock x:Uid="Profile_Applications_Launch" Padding="4,0,0,0" />
+                                                    <FontIcon FontSize="14"
+                                                              Glyph="&#xE768;" />
+                                                    <TextBlock x:Uid="Profile_Applications_Launch"
+                                                               Padding="4,0,0,0" />
                                                 </StackPanel>
                                             </Button.Content>
                                         </Button>
@@ -382,12 +389,6 @@
                                             Style="{StaticResource ExpanderContentSettingStyle}">
                             <CheckBox x:Uid="Profile_Performance_VSync_TripleBuffering"
                                       IsChecked="{x:Bind ViewModel.IsTripleBuffering, Mode=TwoWay}" />
-                            <local:SettingsCard.ActionContent>
-                                <!--  使用魔法修复动画错误  -->
-                                <ComboBox Width="0"
-                                          Height="0"
-                                          IsTabStop="False" />
-                            </local:SettingsCard.ActionContent>
                         </local:SettingsCard>
                     </muxc:Expander.Content>
                 </muxc:Expander>

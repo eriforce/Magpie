@@ -1,5 +1,5 @@
 #pragma once
-#include "MainPage.g.h"
+#include "RootPage.g.h"
 #include "WinRTUtils.h"
 
 namespace winrt::Magpie::App {
@@ -8,9 +8,9 @@ struct Profile;
 
 namespace winrt::Magpie::App::implementation {
 
-struct MainPage : MainPageT<MainPage> {
-	MainPage();
-	~MainPage();
+struct RootPage : RootPageT<RootPage> {
+	RootPage();
+	~RootPage();
 
 	void InitializeComponent();
 
@@ -30,13 +30,15 @@ struct MainPage : MainPageT<MainPage> {
 		return _newApplicationViewModel;
 	}
 
-	void ComboBox_DropDownOpened(IInspectable const&, IInspectable const&);
+	void ComboBox_DropDownOpened(IInspectable const&, IInspectable const&) const;
 
 	void NewProfileConfirmButton_Click(IInspectable const&, RoutedEventArgs const&);
 
 	void NewProfileNameTextBox_KeyDown(IInspectable const&, Input::KeyRoutedEventArgs const& args);
 
 	void NavigateToAboutPage();
+
+	fire_and_forget ShowToast(const hstring& message);
 
 private:
 	void _UpdateTheme(bool updateIcons = true);
@@ -74,7 +76,7 @@ private:
 
 namespace winrt::Magpie::App::factory_implementation {
 
-struct MainPage : MainPageT<MainPage, implementation::MainPage> {
+struct RootPage : RootPageT<RootPage, implementation::RootPage> {
 };
 
 }

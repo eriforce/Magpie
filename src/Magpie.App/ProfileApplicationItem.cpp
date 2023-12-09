@@ -53,6 +53,25 @@ ProfileApplicationItem::ProfileApplicationItem(uint32_t profileIdx, uint32_t app
 
 	_path = _application->pathRule;
 
+	App app = Application::Current().as<App>();
+	RootPage rootPage = app.RootPage();
+	_themeChangedRevoker = rootPage.ActualThemeChanged(
+		auto_revoke,
+		[this](FrameworkElement const& sender, IInspectable const&) {
+		_LoadIcon(sender);
+	}
+	);
+
+	_displayInformation = DisplayInformation::GetForCurrentView();
+	_dpiChangedRevoker = _displayInformation.DpiChanged(
+		auto_revoke,
+		[this](DisplayInformation const&, IInspectable const&) {
+		if (RootPage rootPage = Application::Current().as<App>().RootPage()) {
+			_LoadIcon(rootPage);
+		}
+	}
+	);
+
 	if (_application->isPackaged) {
 		AppXReader appxReader;
 		_exists = appxReader.Initialize(_application->pathRule);
@@ -60,7 +79,7 @@ ProfileApplicationItem::ProfileApplicationItem(uint32_t profileIdx, uint32_t app
 		_exists = Win32Utils::FileExists(_application->pathRule.c_str());
 	}
 
-	_LoadIcon();
+	_LoadIcon(rootPage);
 
 	_applicationRemovedRevoker = ProfileService::Get().ApplicationRemoved(
 		auto_revoke, { this, &ProfileApplicationItem::_ProfileService_ApplicationRemoved });
@@ -106,7 +125,7 @@ void ProfileApplicationItem::Remove() {
 	_applicationIdx = std::numeric_limits<uint32_t>::max();
 }
 
-fire_and_forget ProfileApplicationItem::_LoadIcon() {
+fire_and_forget ProfileApplicationItem::_LoadIcon(FrameworkElement const& rootPage) {
 	static constexpr const UINT ICON_SIZE = 32;
 	std::wstring iconPath;
 	SoftwareBitmap iconBitmap{ nullptr };
@@ -114,12 +133,10 @@ fire_and_forget ProfileApplicationItem::_LoadIcon() {
 	if (_exists) {
 		auto weakThis = get_weak();
 
-		App app = Application::Current().as<App>();
-		MainPage mainPage = app.MainPage();
-		const bool preferLightTheme = mainPage.ActualTheme() == ElementTheme::Light;
+		const bool preferLightTheme = rootPage.ActualTheme() == ElementTheme::Light;
 		DisplayInformation _displayInformation = DisplayInformation::GetForCurrentView();
 		const uint32_t dpi = (uint32_t)std::lroundf(_displayInformation.LogicalDpi());
-		CoreDispatcher dispatcher = mainPage.Dispatcher();
+		CoreDispatcher dispatcher = rootPage.Dispatcher();
 
 		co_await resume_background();
 

@@ -13,6 +13,9 @@
 #include "JsonHelper.h"
 #include "ScalingMode.h"
 #include "LocalizationService.h"
+#include <ShellScalingApi.h>
+
+#pragma comment(lib, "Shcore.lib")
 
 using namespace ::Magpie::Core;
 
@@ -212,7 +215,7 @@ bool AppSettings::Initialize() {
 
 	// 若程序所在目录存在配置文件则为便携模式
 	_isPortableMode = Win32Utils::FileExists(
-		StrUtils::ConcatW(CommonSharedConstants::CONFIG_DIR, CommonSharedConstants::CONFIG_NAME).c_str());
+		StrUtils::Concat(CommonSharedConstants::CONFIG_DIR, CommonSharedConstants::CONFIG_NAME).c_str());
 	_UpdateConfigPath();
 
 	logger.Info(StrUtils::Concat("便携模式：", _isPortableMode ? "是" : "否"));
@@ -337,7 +340,7 @@ void AppSettings::IsPortableMode(bool value) {
 	if (!value) {
 		// 关闭便携模式需删除本地配置文件
 		// 不关心是否成功
-		DeleteFile(StrUtils::ConcatW(_configDir, CommonSharedConstants::CONFIG_NAME).c_str());
+		DeleteFile(StrUtils::Concat(_configDir, CommonSharedConstants::CONFIG_NAME).c_str());
 	}
 
 	Logger::Get().Info(value ? "已开启便携模式" : "已关闭便携模式");
@@ -402,6 +405,20 @@ void AppSettings::CountdownSeconds(uint32_t value) noexcept {
 	SaveAsync();
 }
 
+void AppSettings::IsDeveloperMode(bool value) noexcept {
+	_isDeveloperMode = value;
+	if (!value) {
+		// 关闭开发者模式则禁用所有开发者选项
+		_isDebugMode = false;
+		_isDisableEffectCache = false;
+		_isDisableFontCache = false;
+		_isSaveEffectSources = false;
+		_isWarningsAreErrors = false;
+	}
+
+	SaveAsync();
+}
+
 void AppSettings::IsAlwaysRunAsAdmin(bool value) noexcept {
 	if (_isAlwaysRunAsAdmin == value) {
 		return;
@@ -440,13 +457,18 @@ void AppSettings::_UpdateWindowPlacement() noexcept {
 		return;
 	}
 
-	_windowRect = {
-		wp.rcNormalPosition.left,
-		wp.rcNormalPosition.top,
-		wp.rcNormalPosition.right - wp.rcNormalPosition.left,
-		wp.rcNormalPosition.bottom - wp.rcNormalPosition.top
+	_mainWindowCenter = {
+		(wp.rcNormalPosition.left + wp.rcNormalPosition.right) / 2.0f,
+		(wp.rcNormalPosition.top + wp.rcNormalPosition.bottom) / 2.0f
 	};
-	_isWindowMaximized = wp.showCmd == SW_MAXIMIZE;
+
+	const float dpiFactor = GetDpiForWindow(hwndMain) / float(USER_DEFAULT_SCREEN_DPI);
+	_mainWindowSizeInDips = {
+		(wp.rcNormalPosition.right - wp.rcNormalPosition.left) / dpiFactor,
+		(wp.rcNormalPosition.bottom - wp.rcNormalPosition.top) / dpiFactor,
+	};
+
+	_isMainWindowMaximized = wp.showCmd == SW_MAXIMIZE;
 }
 
 bool AppSettings::_Save(const _AppSettingsData& data) noexcept {
@@ -475,16 +497,16 @@ bool AppSettings::_Save(const _AppSettingsData& data) noexcept {
 
 	writer.Key("windowPos");
 	writer.StartObject();
-	writer.Key("x");
-	writer.Int(data._windowRect.left);
-	writer.Key("y");
-	writer.Int(data._windowRect.top);
+	writer.Key("centerX");
+	writer.Double(data._mainWindowCenter.X);
+	writer.Key("centerY");
+	writer.Double(data._mainWindowCenter.Y);
 	writer.Key("width");
-	writer.Uint((uint32_t)data._windowRect.right);
+	writer.Double(data._mainWindowSizeInDips.Width);
 	writer.Key("height");
-	writer.Uint((uint32_t)data._windowRect.bottom);
+	writer.Double(data._mainWindowSizeInDips.Height);
 	writer.Key("maximized");
-	writer.Bool(data._isWindowMaximized);
+	writer.Bool(data._isMainWindowMaximized);
 	writer.EndObject();
 
 	writer.Key("shortcuts");
@@ -501,6 +523,8 @@ bool AppSettings::_Save(const _AppSettingsData& data) noexcept {
 	writer.Bool(data._isAutoRestore);
 	writer.Key("countdownSeconds");
 	writer.Uint(data._countdownSeconds);
+	writer.Key("developerMode");
+	writer.Bool(data._isDeveloperMode);
 	writer.Key("debugMode");
 	writer.Bool(data._isDebugMode);
 	writer.Key("disableEffectCache");
@@ -599,25 +623,49 @@ void AppSettings::_LoadSettings(const rapidjson::GenericObject<true, rapidjson::
 
 	auto windowPosNode = root.FindMember("windowPos");
 	if (windowPosNode != root.MemberEnd() && windowPosNode->value.IsObject()) {
-		const auto& windowRectObj = windowPosNode->value.GetObj();
+		const auto& windowPosObj = windowPosNode->value.GetObj();
 
-		int x = 0;
-		int y = 0;
-		if (JsonHelper::ReadInt(windowRectObj, "x", x, true)
-			&& JsonHelper::ReadInt(windowRectObj, "y", y, true)) {
-			_windowRect.left = x;
-			_windowRect.top = y;
+		Point center{};
+		Size size{};
+		if (JsonHelper::ReadFloat(windowPosObj, "centerX", center.X, true) &&
+			JsonHelper::ReadFloat(windowPosObj, "centerY", center.Y, true) &&
+			JsonHelper::ReadFloat(windowPosObj, "width", size.Width, true) &&
+			JsonHelper::ReadFloat(windowPosObj, "height", size.Height, true)) {
+			_mainWindowCenter = center;
+			_mainWindowSizeInDips = size;
+		} else {
+			// 尽最大努力和旧版本兼容
+			int x = 0;
+			int y = 0;
+			uint32_t width = 0;
+			uint32_t height = 0;
+			if (JsonHelper::ReadInt(windowPosObj, "x", x, true) &&
+				JsonHelper::ReadInt(windowPosObj, "y", y, true) &&
+				JsonHelper::ReadUInt(windowPosObj, "width", width, true) &&
+				JsonHelper::ReadUInt(windowPosObj, "height", height, true)) {
+				_mainWindowCenter = {
+					x + width / 2.0f,
+					y + height / 2.0f
+				};
+
+				// 如果窗口位置不存在屏幕则使用主屏幕的缩放，猜错的后果仅是窗口尺寸错误，
+				// 无论如何原始缩放信息已经丢失。
+				const HMONITOR hMon = MonitorFromPoint(
+					{ std::lroundf(_mainWindowCenter.X), std::lroundf(_mainWindowCenter.Y) },
+					MONITOR_DEFAULTTOPRIMARY
+				);
+
+				UINT dpi = USER_DEFAULT_SCREEN_DPI;
+				GetDpiForMonitor(hMon, MDT_EFFECTIVE_DPI, &dpi, &dpi);
+				const float dpiFactor = dpi / float(USER_DEFAULT_SCREEN_DPI);
+				_mainWindowSizeInDips = {
+					width / dpiFactor,
+					height / dpiFactor
+				};
+			}
 		}
 
-		uint32_t width = 0;
-		uint32_t height = 0;
-		if (JsonHelper::ReadUInt(windowRectObj, "width", width, true)
-			&& JsonHelper::ReadUInt(windowRectObj, "height", height, true)) {
-			_windowRect.right = (LONG)width;
-			_windowRect.bottom = (LONG)height;
-		}
-
-		JsonHelper::ReadBool(windowRectObj, "maximized", _isWindowMaximized);
+		JsonHelper::ReadBool(windowPosObj, "maximized", _isMainWindowMaximized);
 	}
 
 	auto shortcutsNode = root.FindMember("shortcuts");
@@ -652,6 +700,7 @@ void AppSettings::_LoadSettings(const rapidjson::GenericObject<true, rapidjson::
 	if (_countdownSeconds == 0 || _countdownSeconds > 5) {
 		_countdownSeconds = 3;
 	}
+	JsonHelper::ReadBool(root, "developerMode", _isDeveloperMode);
 	JsonHelper::ReadBool(root, "debugMode", _isDebugMode);
 	JsonHelper::ReadBool(root, "disableEffectCache", _isDisableEffectCache);
 	JsonHelper::ReadBool(root, "disableFontCache", _isDisableFontCache);
@@ -737,7 +786,7 @@ bool AppSettings::_LoadProfile(
 	const rapidjson::GenericObject<true, rapidjson::Value>& profileObj,
 	Profile& profile,
 	bool isDefault
-) {
+) const {
 	if (!isDefault) {
 		if (!JsonHelper::ReadString(profileObj, "name", profile.name, true)) {
 			return false;
@@ -881,7 +930,7 @@ bool AppSettings::_LoadProfile(
 bool AppSettings::_LoadProfileApplication(
 	const rapidjson::GenericObject<true, rapidjson::Value>& applicationObj,
 	ProfileApplication& application
-) {
+) const {
 	if (!JsonHelper::ReadBool(applicationObj, "packaged", application.isPackaged, true)) {
 		return false;
 	}
@@ -905,7 +954,7 @@ bool AppSettings::_LoadProfileApplication(
 	return true;
 }
 
-fire_and_forget AppSettings::_SetTruePath(ProfileApplication& application) {
+fire_and_forget AppSettings::_SetTruePath(ProfileApplication& application) const {
 	HANDLE handle = CreateFile(
 		application.pathRule.c_str(),
 		GENERIC_READ,
@@ -1060,7 +1109,7 @@ void AppSettings::_UpdateConfigPath() noexcept {
 		wchar_t localAppDataDir[MAX_PATH];
 		HRESULT hr = SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppDataDir);
 		if (SUCCEEDED(hr)) {
-			_configDir = StrUtils::ConcatW(
+			_configDir = StrUtils::Concat(
 				localAppDataDir,
 				localAppDataDir[StrUtils::StrLen(localAppDataDir) - 1] == L'\\' ? L"Magpie\\" : L"\\Magpie\\",
 				CommonSharedConstants::CONFIG_DIR

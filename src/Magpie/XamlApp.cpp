@@ -4,7 +4,6 @@
 #include "Win32Utils.h"
 #include "CommonSharedConstants.h"
 #include <fmt/xchar.h>
-#include <Magpie.Core.h>
 #include "ThemeHelper.h"
 #include "TrayIconService.h"
 
@@ -28,7 +27,12 @@ bool XamlApp::Initialize(HINSTANCE hInstance, const wchar_t* arguments) {
 	_InitializeLogger();
 
 	Logger::Get().Info(fmt::format("程序启动\n\t版本：{}\n\t管理员：{}",
-		MAGPIE_TAG, Win32Utils::IsProcessElevated() ? "是" : "否"));
+#ifdef MAGPIE_VERSION_TAG
+		STRING(MAGPIE_VERSION_TAG)
+#else
+		"dev"
+#endif
+		, Win32Utils::IsProcessElevated() ? "是" : "否"));
 
 	if (!_CheckSingleInstance()) {
 		Logger::Get().Info("已经有一个实例正在运行");
@@ -50,12 +54,8 @@ bool XamlApp::Initialize(HINSTANCE hInstance, const wchar_t* arguments) {
 		return false;
 	}
 
-	_mainWndRect = {
-		(int)std::lroundf(options.MainWndRect.X),
-		(int)std::lroundf(options.MainWndRect.Y),
-		(int)std::lroundf(options.MainWndRect.Width),
-		(int)std::lroundf(options.MainWndRect.Height)
-	};
+	_mainWindowCenter = options.MainWindowCenter;
+	_mainWindowSizeInDips = options.MainWindowSizeInDips;
 	_isMainWndMaximized = options.IsWndMaximized;
 
 	ThemeHelper::Initialize();
@@ -133,12 +133,17 @@ void XamlApp::SaveSettings() {
 		WINDOWPLACEMENT wp{};
 		wp.length = sizeof(wp);
 		if (GetWindowPlacement(_mainWindow.Handle(), &wp)) {
-			_mainWndRect = {
-				wp.rcNormalPosition.left,
-				wp.rcNormalPosition.top,
-				wp.rcNormalPosition.right - wp.rcNormalPosition.left,
-				wp.rcNormalPosition.bottom - wp.rcNormalPosition.top
+			_mainWindowCenter = {
+				(wp.rcNormalPosition.left + wp.rcNormalPosition.right) / 2.0f,
+				(wp.rcNormalPosition.top + wp.rcNormalPosition.bottom) / 2.0f
 			};
+
+			const float dpiFactor = GetDpiForWindow(_mainWindow.Handle()) / float(USER_DEFAULT_SCREEN_DPI);
+			_mainWindowSizeInDips = {
+				(wp.rcNormalPosition.right - wp.rcNormalPosition.left) / dpiFactor,
+				(wp.rcNormalPosition.bottom - wp.rcNormalPosition.top) / dpiFactor,
+			};
+			
 			_isMainWndMaximized = wp.showCmd == SW_MAXIMIZE;
 		} else {
 			Logger::Get().Win32Error("GetWindowPlacement 失败");
@@ -207,16 +212,15 @@ void XamlApp::_InitializeLogger() {
 	// 初始化 dll 中的 Logger
 	// Logger 的单例无法在 exe 和 dll 间共享
 	winrt::Magpie::App::LoggerHelper::Initialize((uint64_t)&logger);
-	Magpie::Core::LoggerHelper::Initialize(logger);
 }
 
 bool XamlApp::_CreateMainWindow() {
-	if (!_mainWindow.Create(_hInst, _mainWndRect, _isMainWndMaximized)) {
+	if (!_mainWindow.Create(_hInst, _mainWindowCenter, _mainWindowSizeInDips, _isMainWndMaximized)) {
 		return false;
 	}
 
 	_uwpApp.HwndMain((uint64_t)_mainWindow.Handle());
-	_uwpApp.MainPage(_mainWindow.Content());
+	_uwpApp.RootPage(_mainWindow.Content());
 
 	return true;
 }
@@ -244,7 +248,7 @@ void XamlApp::_QuitWithoutMainWindow() {
 
 void XamlApp::_MainWindow_Destoryed() {
 	_uwpApp.HwndMain(0);
-	_uwpApp.MainPage(nullptr);
+	_uwpApp.RootPage(nullptr);
 
 	if (!TrayIconService::Get().IsShow()) {
 		_QuitWithoutMainWindow();

@@ -6,12 +6,16 @@ namespace Magpie.App {
 
 		String Version { get; };
 
+		Boolean IsDeveloperMode;
+
 		void CheckForUpdates();
 		Boolean IsCheckingForUpdates { get; };
 		Boolean IsCheckForUpdatesButtonEnabled { get; };
 
 		Boolean IsAutoCheckForUpdates;
 		Boolean IsCheckForPreviewUpdates;
+
+		Boolean IsAnyUpdateStatus { get; };
 
 		Boolean IsErrorWhileChecking;
 		Boolean IsNoUpdate;

@@ -1,7 +1,7 @@
 #include "pch.h"
-#include "MainPage.h"
-#if __has_include("MainPage.g.cpp")
-#include "MainPage.g.cpp"
+#include "RootPage.h"
+#if __has_include("RootPage.g.cpp")
+#include "RootPage.g.cpp"
 #endif
 
 #include "XamlUtils.h"
@@ -31,10 +31,10 @@ namespace winrt::Magpie::App::implementation {
 
 static constexpr const uint32_t FIRST_PROFILE_ITEM_IDX = 4;
 
-MainPage::MainPage() : _newApplicationViewModel(-1) {
+RootPage::RootPage() : _newApplicationViewModel(-1) {
 	_themeChangedRevoker = AppSettings::Get().ThemeChanged(auto_revoke, [this](Theme) { _UpdateTheme(); });
 	_colorValuesChangedRevoker = _uiSettings.ColorValuesChanged(
-		auto_revoke, { this, &MainPage::_UISettings_ColorValuesChanged });
+		auto_revoke, { this, &RootPage::_UISettings_ColorValuesChanged });
 
 	_displayInformation = DisplayInformation::GetForCurrentView();
 	_dpiChangedRevoker = _displayInformation.DpiChanged(
@@ -42,19 +42,19 @@ MainPage::MainPage() : _newApplicationViewModel(-1) {
 
 	ProfileService& profileService = ProfileService::Get();
 	_profileAddedRevoker = profileService.ProfileAdded(
-		auto_revoke, { this, &MainPage::_ProfileService_ProfileAdded });
+		auto_revoke, { this, &RootPage::_ProfileService_ProfileAdded });
 	_profileRenamedRevoker = profileService.ProfileRenamed(
-		auto_revoke, { this, &MainPage::_ProfileService_ProfileRenamed });
+		auto_revoke, { this, &RootPage::_ProfileService_ProfileRenamed });
 	_profileRemovedRevoker = profileService.ProfileRemoved(
-		auto_revoke, { this, &MainPage::_ProfileService_ProfileRemoved });
+		auto_revoke, { this, &RootPage::_ProfileService_ProfileRemoved });
 	_profileMovedRevoker = profileService.ProfileMoved(
-		auto_revoke, { this, &MainPage::_ProfileService_ProfileReordered });
+		auto_revoke, { this, &RootPage::_ProfileService_ProfileReordered });
 
 	// 设置 Language 属性帮助 XAML 选择合适的字体，比如繁体中文使用 Microsoft JhengHei UI，日语使用 Yu Gothic UI
 	Language(LocalizationService::Get().Language());
 }
 
-MainPage::~MainPage() {
+RootPage::~RootPage() {
 	ContentDialogHelper::CloseActiveDialog();
 
 	// 不手动置空会内存泄露
@@ -65,8 +65,8 @@ MainPage::~MainPage() {
 	AppXReader::ClearCache();
 }
 
-void MainPage::InitializeComponent() {
-	MainPageT::InitializeComponent();
+void RootPage::InitializeComponent() {
+	RootPageT::InitializeComponent();
 
 	_UpdateTheme(false);
 
@@ -88,17 +88,17 @@ void MainPage::InitializeComponent() {
 	}
 }
 
-void MainPage::Loaded(IInspectable const&, RoutedEventArgs const&) {
+void RootPage::Loaded(IInspectable const&, RoutedEventArgs const&) {
 	// 消除焦点框
 	IsTabStop(true);
 	Focus(FocusState::Programmatic);
 	IsTabStop(false);
 
 	// 设置 NavigationView 内的 Tooltip 的主题
-	XamlUtils::UpdateThemeOfTooltips(*this, ActualTheme());
+	XamlUtils::UpdateThemeOfTooltips(RootNavigationView(), ActualTheme());
 }
 
-void MainPage::NavigationView_SelectionChanged(
+void RootPage::NavigationView_SelectionChanged(
 	MUXC::NavigationView const&,
 	MUXC::NavigationViewSelectionChangedEventArgs const& args
 ) {
@@ -139,7 +139,7 @@ void MainPage::NavigationView_SelectionChanged(
 	}
 }
 
-void MainPage::NavigationView_PaneOpening(MUXC::NavigationView const&, IInspectable const&) {
+void RootPage::NavigationView_PaneOpening(MUXC::NavigationView const&, IInspectable const&) {
 	if (Win32Utils::GetOSVersion().IsWin11()) {
 		// Win11 中 Tooltip 自动适应主题
 		return;
@@ -158,18 +158,18 @@ void MainPage::NavigationView_PaneOpening(MUXC::NavigationView const&, IInspecta
 	}
 }
 
-void MainPage::NavigationView_PaneClosing(MUXC::NavigationView const&, MUXC::NavigationViewPaneClosingEventArgs const&) {
+void RootPage::NavigationView_PaneClosing(MUXC::NavigationView const&, MUXC::NavigationViewPaneClosingEventArgs const&) {
 	XamlUtils::UpdateThemeOfTooltips(*this, ActualTheme());
 }
 
-void MainPage::NavigationView_DisplayModeChanged(MUXC::NavigationView const& nv, MUXC::NavigationViewDisplayModeChangedEventArgs const&) {
+void RootPage::NavigationView_DisplayModeChanged(MUXC::NavigationView const& nv, MUXC::NavigationViewDisplayModeChangedEventArgs const&) {
 	bool isExpanded = nv.DisplayMode() == MUXC::NavigationViewDisplayMode::Expanded;
 	nv.IsPaneToggleButtonVisible(!isExpanded);
 	if (isExpanded) {
 		nv.IsPaneOpen(true);
 	}
 
-	// HACK!
+	// !!! HACK !!!
 	// 使导航栏的可滚动区域不会覆盖标题栏
 	FrameworkElement menuItemsScrollViewer = nv.GetTemplateChild(L"MenuItemsScrollViewer").as<FrameworkElement>();
 	menuItemsScrollViewer.Margin({ 0,isExpanded ? TitleBar().ActualHeight() : 0.0,0,0});
@@ -177,7 +177,7 @@ void MainPage::NavigationView_DisplayModeChanged(MUXC::NavigationView const& nv,
 	XamlUtils::UpdateThemeOfTooltips(*this, ActualTheme());
 }
 
-fire_and_forget MainPage::NavigationView_ItemInvoked(MUXC::NavigationView const&, MUXC::NavigationViewItemInvokedEventArgs const& args) {
+fire_and_forget RootPage::NavigationView_ItemInvoked(MUXC::NavigationView const&, MUXC::NavigationViewItemInvokedEventArgs const& args) {
 	if (args.InvokedItemContainer() == NewProfileNavigationViewItem()) {
 		const UINT dpi = (UINT)std::lroundf(_displayInformation.LogicalDpi());
 		const bool isLightTheme = ActualTheme() == ElementTheme::Light;
@@ -190,24 +190,80 @@ fire_and_forget MainPage::NavigationView_ItemInvoked(MUXC::NavigationView const&
 	}
 }
 
-void MainPage::ComboBox_DropDownOpened(IInspectable const&, IInspectable const&) {
+void RootPage::ComboBox_DropDownOpened(IInspectable const&, IInspectable const&) const {
 	XamlUtils::UpdateThemeOfXamlPopups(XamlRoot(), ActualTheme());
 }
 
-void MainPage::NewProfileConfirmButton_Click(IInspectable const&, RoutedEventArgs const&) {
+void RootPage::NewProfileConfirmButton_Click(IInspectable const&, RoutedEventArgs const&) {
 	_newApplicationViewModel.Confirm();
 	NewProfileFlyout().Hide();
 }
 
-void MainPage::NewProfileNameTextBox_KeyDown(IInspectable const&, Input::KeyRoutedEventArgs const& args) {
+void RootPage::NewProfileNameTextBox_KeyDown(IInspectable const&, Input::KeyRoutedEventArgs const& args) {
 	if (args.Key() == VirtualKey::Enter && _newApplicationViewModel.IsConfirmButtonEnabled()) {
 		NewProfileConfirmButton_Click(nullptr, nullptr);
 	}
 }
 
-void MainPage::NavigateToAboutPage() {
+void RootPage::NavigateToAboutPage() {
 	MUXC::NavigationView nv = RootNavigationView();
 	nv.SelectedItem(nv.FooterMenuItems().GetAt(0));
+}
+
+fire_and_forget RootPage::ShowToast(const hstring& message) {
+	// !!! HACK !!!
+	// 重用 TeachingTip 有一个 bug：前一个 Toast 正在消失时新的 Toast 不会显示。为了
+	// 规避它，我们每次都创建新的 TeachingTip，但要保留旧对象的引用，因为播放动画时销毁
+	// 会导致崩溃。oldToastTeachingTip 的生存期可确保动画播放完毕。
+	MUXC::TeachingTip oldToastTeachingTip = ToastTeachingTip();
+	if (oldToastTeachingTip) {
+		UnloadObject(oldToastTeachingTip);
+	}
+
+	weak_ref<MUXC::TeachingTip> weakTeachingTip;
+	{
+		// 创建新的 TeachingTip
+		MUXC::TeachingTip newTeachingTip = FindName(L"ToastTeachingTip").as<MUXC::TeachingTip>();
+		ToastTextBlock().Text(message);
+		newTeachingTip.IsOpen(true);
+
+		// !!! HACK !!!
+		// 我们不想要 IsLightDismissEnabled，因为它会阻止用户和其他控件交互，但我们也不想要关闭按钮，于是
+		// 手动隐藏它。我们必须在模板加载完成后再做这些，但 TeachingTip 没有 Opening 事件，于是有了又一个
+		// workaround：监听 ToastTextBlock 的 LayoutUpdated 事件，它在 TeachingTip 显示前必然会被引发。
+		ToastTextBlock().LayoutUpdated([weak(weak_ref(newTeachingTip))](IInspectable const&, IInspectable const&) {
+			auto toastTeachingTip = weak.get();
+			if (!toastTeachingTip) {
+				return;
+			}
+
+			// 隐藏关闭按钮
+			if (DependencyObject closeButton = toastTeachingTip.GetTemplateChild(L"AlternateCloseButton")) {
+				closeButton.as<FrameworkElement>().Visibility(Visibility::Collapsed);
+			}
+
+			// 减小 Flyout 尺寸
+			if (DependencyObject container = toastTeachingTip.GetTemplateChild(L"TailOcclusionGrid")) {
+				container.as<FrameworkElement>().MinWidth(0.0);
+			}
+		});
+
+		weakTeachingTip = newTeachingTip;
+	}
+
+	auto weakThis = get_weak();
+	CoreDispatcher dispatcher = Dispatcher();
+	// 显示时长固定 2 秒
+	co_await 2s;
+	co_await dispatcher;
+
+	if (weakThis.get()) {
+		MUXC::TeachingTip curTeachingTip = ToastTeachingTip();
+		if (curTeachingTip == weakTeachingTip.get()) {
+			// 如果已经显示新的 Toast 则无需关闭，因为 newTeachingTip 已被卸载（但仍在生存期内）
+			curTeachingTip.IsOpen(false);
+		}
+	}
 }
 
 static Color Win32ColorToWinRTColor(COLORREF color) {
@@ -219,7 +275,7 @@ static bool IsColorLight(const Color& clr) {
 	return 5 * clr.G + 2 * clr.R + clr.B > 8 * 128;
 }
 
-void MainPage::_UpdateTheme(bool updateIcons) {
+void RootPage::_UpdateTheme(bool updateIcons) {
 	Theme theme = AppSettings::Get().Theme();
 
 	bool isDarkTheme = FALSE;
@@ -252,7 +308,7 @@ void MainPage::_UpdateTheme(bool updateIcons) {
 	}
 }
 
-fire_and_forget MainPage::_LoadIcon(MUXC::NavigationViewItem const& item, const Profile& profile, bool skipDesktop) {
+fire_and_forget RootPage::_LoadIcon(MUXC::NavigationViewItem const& item, const Profile& profile, bool skipDesktop) {
 	weak_ref<MUXC::NavigationViewItem> weakRef(item);
 
 	static constexpr const UINT ICON_SIZE = 16;
@@ -325,7 +381,7 @@ fire_and_forget MainPage::_LoadIcon(MUXC::NavigationViewItem const& item, const 
 	}
 }
 
-fire_and_forget MainPage::_UISettings_ColorValuesChanged(Windows::UI::ViewManagement::UISettings const&, IInspectable const&) {
+fire_and_forget RootPage::_UISettings_ColorValuesChanged(Windows::UI::ViewManagement::UISettings const&, IInspectable const&) {
 	auto weakThis = get_weak();
 	co_await Dispatcher();
 
@@ -340,7 +396,7 @@ fire_and_forget MainPage::_UISettings_ColorValuesChanged(Windows::UI::ViewManage
 	_UpdateIcons(true);
 }
 
-void MainPage::_UpdateIcons(bool skipDesktop) {
+void RootPage::_UpdateIcons(bool skipDesktop) {
 	IVector<IInspectable> navMenuItems = RootNavigationView().MenuItems();
 	const std::vector<Profile>& profiles = AppSettings::Get().Profiles();
 
@@ -350,7 +406,7 @@ void MainPage::_UpdateIcons(bool skipDesktop) {
 	}
 }
 
-void MainPage::_ProfileService_ProfileAdded(Profile& profile) {
+void RootPage::_ProfileService_ProfileAdded(Profile& profile) {
 	MUXC::NavigationViewItem item;
 	item.Content(box_value(profile.name));
 	// 用于占位
@@ -362,21 +418,21 @@ void MainPage::_ProfileService_ProfileAdded(Profile& profile) {
 	RootNavigationView().SelectedItem(item);
 }
 
-void MainPage::_ProfileService_ProfileRenamed(uint32_t idx) {
+void RootPage::_ProfileService_ProfileRenamed(uint32_t idx) {
 	RootNavigationView().MenuItems()
 		.GetAt(FIRST_PROFILE_ITEM_IDX + idx)
 		.as<MUXC::NavigationViewItem>()
 		.Content(box_value(AppSettings::Get().Profiles()[idx].name));
 }
 
-void MainPage::_ProfileService_ProfileRemoved(uint32_t idx) {
+void RootPage::_ProfileService_ProfileRemoved(uint32_t idx) {
 	MUXC::NavigationView nv = RootNavigationView();
 	IVector<IInspectable> menuItems = nv.MenuItems();
 	nv.SelectedItem(menuItems.GetAt(FIRST_PROFILE_ITEM_IDX - 1));
 	menuItems.RemoveAt(FIRST_PROFILE_ITEM_IDX + idx);
 }
 
-void MainPage::_ProfileService_ProfileReordered(uint32_t profileIdx, bool isMoveUp) {
+void RootPage::_ProfileService_ProfileReordered(uint32_t profileIdx, bool isMoveUp) {
 	IVector<IInspectable> menuItems = RootNavigationView().MenuItems();
 
 	uint32_t curIdx = FIRST_PROFILE_ITEM_IDX + profileIdx;

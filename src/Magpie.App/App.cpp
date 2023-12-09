@@ -50,12 +50,6 @@ App::App() {
 	}
 
 	LocalizationService::Get().EarlyInitialize();
-
-	// 根据操作系统选择图标字体
-	Resources().Insert(
-		box_value(L"SymbolThemeFontFamily"),
-		FontFamily(isWin11 ? L"Segoe Fluent Icons" : L"Segoe MDL2 Assets")
-	);
 }
 
 App::~App() {
@@ -88,13 +82,8 @@ StartUpOptions App::Initialize(int) {
 	}
 
 	result.IsError = false;
-	const RECT& windowRect = settings.WindowRect();
-	result.MainWndRect = {
-		(float)windowRect.left,
-		(float)windowRect.top,
-		(float)windowRect.right,
-		(float)windowRect.bottom
-	};
+	result.MainWindowCenter = settings.MainWindowCenter();
+	result.MainWindowSizeInDips = settings.MainWindowSizeInDips();
 	result.IsWndMaximized= settings.IsWindowMaximized();
 	result.IsNeedElevated = settings.IsAlwaysRunAsAdmin();
 
@@ -136,14 +125,14 @@ void App::HwndMain(uint64_t value) noexcept {
 	_hwndMainChangedEvent(*this, value);
 }
 
-void App::MainPage(Magpie::App::MainPage const& mainPage) noexcept {
+void App::RootPage(Magpie::App::RootPage const& rootPage) noexcept {
 	// 显示主窗口前等待 EffectsService 完成初始化
 	EffectsService::Get().WaitForInitialize();
 
-	if (mainPage) {
-		// 不存储对 MainPage 的强引用
-		// XAML Islands 内部保留着对 MainPage 的强引用，MainPage 的生命周期是无法预知的
-		_mainPage = weak_ref(mainPage);
+	if (rootPage) {
+		// 不存储对 RootPage 的强引用
+		// XAML Islands 内部保留着对 RootPage 的强引用，RootPage 的生命周期是无法预知的
+		_rootPage = weak_ref(rootPage);
 	} else {
 		UpdateService::Get().ClosingMainWindow();
 	}

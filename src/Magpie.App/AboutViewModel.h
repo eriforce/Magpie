@@ -21,6 +21,9 @@ struct AboutViewModel : AboutViewModelT<AboutViewModel> {
 
 	hstring Version() const noexcept;
 
+	bool IsDeveloperMode() const noexcept;
+	void IsDeveloperMode(bool value);
+
 	fire_and_forget CheckForUpdates();
 
 	bool IsCheckForPreviewUpdates() const noexcept;
@@ -30,6 +33,8 @@ struct AboutViewModel : AboutViewModelT<AboutViewModel> {
 
 	bool IsAutoCheckForUpdates() const noexcept;
 	void IsAutoCheckForUpdates(bool value) noexcept;
+
+	bool IsAnyUpdateStatus() const noexcept;
 
 	bool IsCheckingForUpdates() const noexcept;
 

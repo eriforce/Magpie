@@ -21,7 +21,7 @@ ScalingModeItem::ScalingModeItem(uint32_t index, bool isInitialExpanded)
 		std::vector<IInspectable> linkedProfiles;
 		const Profile& defaultProfile = AppSettings::Get().DefaultProfile();
 		if (defaultProfile.scalingMode == (int)index) {
-			hstring defaults = ResourceLoader::GetForCurrentView().GetString(L"Main_Defaults/Content");
+			hstring defaults = ResourceLoader::GetForCurrentView().GetString(L"Root_Defaults/Content");
 			linkedProfiles.push_back(box_value(defaults));
 		}
 		for (const Profile& profile : AppSettings::Get().Profiles()) {
@@ -276,7 +276,8 @@ void ScalingModeItem::RenameButton_Click() {
 		return;
 	}
 
-	XamlUtils::CloseXamlPopups(Application::Current().as<App>().MainPage().XamlRoot());
+	// Flyout 没有 IsOpen 可供绑定，只能用变通方法关闭
+	XamlUtils::ClosePopups(Application::Current().as<App>().RootPage().XamlRoot());
 
 	_Data().name = _trimedRenameText;
 	_propertyChangedEvent(*this, PropertyChangedEventArgs(L"Name"));
