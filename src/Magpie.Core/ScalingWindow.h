@@ -58,6 +58,8 @@ public:
 
 	void CleanAfterSrcRepositioned() noexcept;
 
+	void Toggle3DGameMode() noexcept;
+
 protected:
 	LRESULT _MessageHandler(UINT msg, WPARAM wParam, LPARAM lParam) noexcept;
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "ProfileViewModel.g.h"
 #include "SmallVector.h"
+#include "WinRTUtils.h"
 
 namespace winrt::Magpie::App {
 struct Profile;
@@ -141,6 +142,9 @@ struct ProfileViewModel : ProfileViewModelT<ProfileViewModel>,
 	void IsDirectFlipDisabled(bool value);
 
 private:
+	WinRTUtils::EventRevoker _is3DGameModeChangedRevoker;
+	void _ScalingService_Is3DGameModeChanged(bool value);
+
 	fire_and_forget _LoadIcon(FrameworkElement const& rootPage);
 
 	bool _isProgramExist = true;

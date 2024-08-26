@@ -123,9 +123,16 @@ ProfileViewModel::ProfileViewModel(int profileIdx) : _isDefaultProfile(profileId
 	if (_data->graphicsCard >= _graphicsCards.size()) {
 		_data->graphicsCard = -1;
 	}
+
+	_is3DGameModeChangedRevoker = ScalingService::Get().Is3DGameModeChanged(
+		auto_revoke, { this, &ProfileViewModel::_ScalingService_Is3DGameModeChanged });
 }
 
 ProfileViewModel::~ProfileViewModel() {}
+
+void ProfileViewModel::_ScalingService_Is3DGameModeChanged(bool value) {
+	Is3DGameMode(value);
+}
 
 bool ProfileViewModel::IsNotDefaultProfile() const noexcept {
 	return !_data->name.empty();

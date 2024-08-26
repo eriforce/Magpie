@@ -37,6 +37,7 @@ void ShortcutService::Initialize() {
 
 	_RegisterShortcut(ShortcutAction::Scale);
 	_RegisterShortcut(ShortcutAction::Overlay);
+	_RegisterShortcut(ShortcutAction::Is3DGameMode);
 
 	AppSettings::Get().ShortcutChanged({ this, &ShortcutService::_AppSettings_OnShortcutChanged });
 

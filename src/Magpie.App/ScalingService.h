@@ -53,6 +53,7 @@ public:
 	WinRTUtils::Event<delegate<double>> TimerTick;
 	WinRTUtils::Event<delegate<HWND>> WndToRestoreChanged;
 	WinRTUtils::Event<delegate<bool>> IsRunningChanged;
+	WinRTUtils::Event<delegate<bool>> Is3DGameModeChanged;
 
 private:
 	ScalingService() = default;

@@ -126,6 +126,15 @@ void ScalingService::_ShortcutService_ShortcutPressed(ShortcutAction action) {
 		}
 		break;
 	}
+	case ShortcutAction::Is3DGameMode:
+	{
+		if (_scalingRuntime->IsRunning()) {
+			bool value = _scalingRuntime->Toggle3DGameMode();
+			Is3DGameModeChanged.Invoke(value);
+			return;
+		}
+		break;
+	}
 	default:
 		break;
 	}

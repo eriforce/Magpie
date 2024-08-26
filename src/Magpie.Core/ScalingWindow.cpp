@@ -352,6 +352,11 @@ void ScalingWindow::CleanAfterSrcRepositioned() noexcept {
 	_isSrcRepositioning = false;
 }
 
+void ScalingWindow::Toggle3DGameMode() noexcept {
+	bool newValue = !_options.Is3DGameMode();
+	_options.Is3DGameMode(newValue);
+}
+
 LRESULT ScalingWindow::_MessageHandler(UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
 	if (_renderer) {
 		_renderer->MessageHandler(msg, wParam, lParam);

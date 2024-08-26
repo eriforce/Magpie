@@ -17,6 +17,8 @@ public:
 
 	void Stop();
 
+	bool Toggle3DGameMode() noexcept;
+
 	bool IsRunning() const noexcept {
 		return _state.load(std::memory_order_relaxed) != _State::Idle;
 	}

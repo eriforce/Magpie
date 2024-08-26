@@ -45,6 +45,8 @@ struct Profile {
 
 	// 若为打包应用，PathRule 存储 AUMID
 	std::wstring pathRule;
+	std::wstring truePath;
+	std::wstring GetTruePath() const noexcept;
 	std::wstring classNameRule;
 
 	// 如果在同一个驱动器上则存储相对路径，否则存储绝对路径
