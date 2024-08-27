@@ -352,6 +352,10 @@ void ScalingWindow::CleanAfterSrcRepositioned() noexcept {
 	_isSrcRepositioning = false;
 }
 
+void ScalingWindow::Set3DGameMode(bool value) noexcept {
+	_options.Is3DGameMode(value);
+}
+
 LRESULT ScalingWindow::_MessageHandler(UINT msg, WPARAM wParam, LPARAM lParam) noexcept {
 	if (_renderer) {
 		_renderer->MessageHandler(msg, wParam, lParam);
@@ -471,13 +475,13 @@ int ScalingWindow::_CheckSrcState() const noexcept {
 		HWND hwndForeground = GetForegroundWindow();
 
 		// 3D 游戏模式下打开叠加层后如果源窗口意外回到前台应关闭叠加层
-		if (_options.Is3DGameMode() && _renderer->IsOverlayVisible() && hwndForeground == _hwndSrc) {
-			_renderer->SetOverlayVisibility(false, true);
-		}
+		// if (_options.Is3DGameMode() && _renderer->IsOverlayVisible() && hwndForeground == _hwndSrc) {
+		// 	_renderer->SetOverlayVisibility(false, true);
+		// }
 
 		// 在 3D 游戏模式下打开叠加层则全屏窗口可以接收焦点
 		if (!_options.Is3DGameMode() || !_renderer->IsOverlayVisible() || hwndForeground != _hWnd) {
-			if (hwndForeground && hwndForeground != _hwndSrc && !_CheckForeground(hwndForeground)) {
+			if (hwndForeground && hwndForeground != _hwndSrc && hwndForeground != _hWnd && !_CheckForeground(hwndForeground)) {
 				Logger::Get().Info("前台窗口已改变");
 				return 1;
 			}

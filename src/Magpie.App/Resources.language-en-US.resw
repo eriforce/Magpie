@@ -270,6 +270,9 @@
   <data name="Home_Shortcuts_Overlay_ShortcutControl.Title" xml:space="preserve">
     <value>In-game overlay shortcut</value>
   </data>
+  <data name="Profile_General_3DGameMode_ShortcutControl.Title" xml:space="preserve">
+    <value>3D game mode</value>
+  </data>
   <data name="Home_Shortcuts_Scale.Header" xml:space="preserve">
     <value>Scale</value>
   </data>

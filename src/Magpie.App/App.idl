@@ -43,6 +43,7 @@ namespace Magpie.App {
 	enum ShortcutAction {
 		Scale,
 		Overlay,
+		Is3DGameMode,
 		COUNT_OR_NONE
 	};
 

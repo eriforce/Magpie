@@ -111,7 +111,7 @@ static bool TestNewProfileImpl(
 		}
 	} else {
 		for (const Profile& rule : profiles) {
-			if (!rule.isPackaged && rule.pathRule == pathOrAumid && rule.classNameRule == parsedClassName) {
+			if (!rule.isPackaged && rule.GetTruePath() == pathOrAumid && rule.classNameRule == parsedClassName) {
 				return false;
 			}
 		}
@@ -241,7 +241,7 @@ const Profile* ProfileService::GetProfileForWindow(HWND hWnd, bool forAutoScale)
 			}
 		}
 		
-		if (profile.pathRule == path) {
+		if (profile.GetTruePath() == path) {
 			return &profile;
 		}
 	}
