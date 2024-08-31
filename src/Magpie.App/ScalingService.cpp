@@ -126,6 +126,18 @@ void ScalingService::_ShortcutService_ShortcutPressed(ShortcutAction action) {
 		}
 		break;
 	}
+	case ShortcutAction::Is3DGameMode:
+	{
+		if (_scalingRuntime->IsRunning()) {
+			Profile* profile = const_cast<Profile*>(ProfileService::Get().GetProfileForWindow(_hwndCurSrc, false));
+			bool newValue = !profile->Is3DGameMode();
+			profile->Is3DGameMode(newValue);
+			_scalingRuntime->Set3DGameMode(newValue);
+			Is3DGameModeChanged.Invoke(newValue);
+			return;
+		}
+		break;
+	}
 	default:
 		break;
 	}

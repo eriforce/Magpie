@@ -84,6 +84,13 @@ ProfileViewModel::ProfileViewModel(int profileIdx) : _isDefaultProfile(profileId
 			}
 		);
 
+		_is3DGameModeChangedRevoker = ScalingService::Get().Is3DGameModeChanged(
+			auto_revoke,
+			[this](bool value) {
+				RaisePropertyChanged(L"Is3DGameMode");
+			}
+		);
+
 		if (_data->isPackaged) {
 			AppXReader appxReader;
 			_isProgramExist = appxReader.Initialize(_data->pathRule);

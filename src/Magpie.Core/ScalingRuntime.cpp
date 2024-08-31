@@ -93,6 +93,17 @@ void ScalingRuntime::Stop() {
 	});
 }
 
+void ScalingRuntime::Set3DGameMode(bool value) noexcept {
+	if (!IsRunning()) {
+		return;
+	}
+
+	_Dispatcher().TryEnqueue([value]() {
+		ScalingWindow& scalingWindow = ScalingWindow::Get();
+		scalingWindow.Set3DGameMode(value);
+	});
+}
+
 // 返回值:
 // -1: 应取消缩放
 // 0: 仍在调整中

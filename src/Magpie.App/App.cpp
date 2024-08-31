@@ -30,12 +30,12 @@
 #include "EffectsService.h"
 #include "UpdateService.h"
 #include "LocalizationService.h"
-#include "Logger.h"
 
 namespace winrt::Magpie::App::implementation {
 
 App::App() {
 	UnhandledException([this](IInspectable const&, UnhandledExceptionEventArgs const& e) {
+		Logger::Get().Error(to_string(e.Message()));
 		Logger::Get().ComCritical("未处理的异常", e.Exception().value);
 
 		if (IsDebuggerPresent()) {

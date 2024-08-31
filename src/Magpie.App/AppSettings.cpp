@@ -499,6 +499,8 @@ bool AppSettings::_Save(const _AppSettingsData& data) noexcept {
 	writer.Uint(EncodeShortcut(data._shortcuts[(size_t)ShortcutAction::Scale]));
 	writer.Key("overlay");
 	writer.Uint(EncodeShortcut(data._shortcuts[(size_t)ShortcutAction::Overlay]));
+	writer.Key("3DGameMode");
+	writer.Uint(EncodeShortcut(data._shortcuts[(size_t)ShortcutAction::Is3DGameMode]));
 	writer.EndObject();
 
 	writer.Key("autoRestore");
@@ -654,6 +656,11 @@ void AppSettings::_LoadSettings(const rapidjson::GenericObject<true, rapidjson::
 		if (overlayNode != shortcutsObj.MemberEnd() && overlayNode->value.IsUint()) {
 			DecodeShortcut(overlayNode->value.GetUint(), _shortcuts[(size_t)ShortcutAction::Overlay]);
 		}
+
+		auto is3DGameModeNode = shortcutsObj.FindMember("3DGameMode");
+		if (is3DGameModeNode != shortcutsObj.MemberEnd() && is3DGameModeNode->value.IsUint()) {
+			DecodeShortcut(is3DGameModeNode->value.GetUint(), _shortcuts[(size_t)ShortcutAction::Is3DGameMode]);
+		}
 	}
 
 	JsonHelper::ReadBool(root, "autoRestore", _isAutoRestore);
@@ -771,6 +778,10 @@ bool AppSettings::_LoadProfile(
 		JsonHelper::ReadString(profileObj, "launcherPath", profile.launcherPath);
 		JsonHelper::ReadBool(profileObj, "autoScale", profile.isAutoScale);
 		JsonHelper::ReadString(profileObj, "launchParameters", profile.launchParameters);
+
+		if (!profile.isPackaged) {
+			_SetTruePath(profile);
+		}
 	}
 
 	JsonHelper::ReadInt(profileObj, "scalingMode", profile.scalingMode);
@@ -874,6 +885,37 @@ bool AppSettings::_LoadProfile(
 	return true;
 }
 
+fire_and_forget AppSettings::_SetTruePath(Profile& profile) const {
+	HANDLE handle = CreateFile(
+		profile.pathRule.c_str(),
+		GENERIC_READ,
+		FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		NULL,
+		OPEN_EXISTING,
+		FILE_ATTRIBUTE_NORMAL,
+		NULL
+	);
+
+	if (handle == INVALID_HANDLE_VALUE) {
+		co_return;
+	}
+
+	TCHAR path[MAX_PATH];
+	DWORD length = GetFinalPathNameByHandle(
+		handle,
+		path,
+		MAX_PATH,
+		0
+	);
+
+	if (length > 0) {
+		// Skip `\\?\` prefix
+		profile.truePath = &path[4];
+	}
+
+	CloseHandle(handle);
+}
+
 bool AppSettings::_SetDefaultShortcuts() noexcept {
 	bool changed = false;
 
@@ -891,6 +933,15 @@ bool AppSettings::_SetDefaultShortcuts() noexcept {
 		overlayShortcut.win = true;
 		overlayShortcut.shift = true;
 		overlayShortcut.code = 'D';
+
+		changed = true;
+	}
+
+	Shortcut& is3DGameModeShortcut = _shortcuts[(size_t)ShortcutAction::Is3DGameMode];
+	if (is3DGameModeShortcut.IsEmpty()) {
+		is3DGameModeShortcut.win = true;
+		is3DGameModeShortcut.shift = true;
+		is3DGameModeShortcut.code = 'E';
 
 		changed = true;
 	}
