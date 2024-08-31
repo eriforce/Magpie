@@ -159,7 +159,7 @@ static SmallVector<uint32_t> GenerateTimelineColors(const std::vector<Renderer::
 }
 
 OverlayDrawer::~OverlayDrawer() {
-	if (ScalingWindow::Get().Options().Is3DGameMode() && IsUIVisible()) {
+	if (_openWith3DGameMode && IsUIVisible()) {
 		HWND hwndSrc = ScalingWindow::Get().HwndSrc();
 		EnableWindow(hwndSrc, TRUE);
 		// 此时用户通过热键退出缩放，应激活源窗口
@@ -261,7 +261,8 @@ void OverlayDrawer::SetUIVisibility(bool value, bool noSetForeground) noexcept {
 	_isUIVisiable = value;
 
 	if (value) {
-		if (ScalingWindow::Get().Options().Is3DGameMode()) {
+		_openWith3DGameMode = ScalingWindow::Get().Options().Is3DGameMode();
+		if (_openWith3DGameMode) {
 			// 使全屏窗口不透明且可以接收焦点
 			HWND hwndHost = ScalingWindow::Get().Handle();
 			INT_PTR style = GetWindowLongPtr(hwndHost, GWL_EXSTYLE);
@@ -278,7 +279,7 @@ void OverlayDrawer::SetUIVisibility(bool value, bool noSetForeground) noexcept {
 			_imguiImpl.ClearStates();
 		}
 
-		if (ScalingWindow::Get().Options().Is3DGameMode()) {
+		if (_openWith3DGameMode) {
 			// 还原全屏窗口样式
 			HWND hwndHost = ScalingWindow::Get().Handle();
 			INT_PTR style = GetWindowLongPtr(hwndHost, GWL_EXSTYLE);

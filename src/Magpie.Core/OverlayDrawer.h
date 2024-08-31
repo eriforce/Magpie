@@ -87,6 +87,7 @@ private:
 
 	bool _isUIVisiable = false;
 	bool _isFirstFrame = true;
+	bool _openWith3DGameMode;
 };
 
 }
