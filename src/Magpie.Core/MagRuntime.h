@@ -14,7 +14,7 @@ public:
 	~MagRuntime();
 
 	HWND HwndSrc() const {
-		return _running ? _hwndSrc : 0;
+		return _hwndSrc.load(std::memory_order_relaxed);
 	}
 
 	void Run(HWND hwndSrc, const MagOptions& options);
@@ -26,7 +26,7 @@ public:
 	void Set3DGameMode(bool value) noexcept;
 
 	bool IsRunning() const {
-		return _running;
+		return HwndSrc();
 	}
 
 	// 调用者应处理线程同步
@@ -51,12 +51,13 @@ private:
 	// 确保 _dqc 完成初始化
 	void _EnsureDispatcherQueue() const noexcept;
 
-	std::thread _magWindThread;
-	std::atomic<bool> _running = false;
-	HWND _hwndSrc = 0;
-	winrt::Windows::System::DispatcherQueueController _dqc{ nullptr };
-
+	// 主线程使用 DispatcherQueue 和缩放线程沟通，因此无需约束内存定序，只需确保原子性即可
+	std::atomic<HWND> _hwndSrc;
 	winrt::event<winrt::delegate<bool>> _isRunningChangedEvent;
+
+	winrt::Windows::System::DispatcherQueueController _dqc{ nullptr };
+	// 应在 _dqc 后初始化
+	std::thread _magWindThread;
 };
 
 }

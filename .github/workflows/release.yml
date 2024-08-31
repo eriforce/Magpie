@@ -19,6 +19,10 @@ on:
         description: 'Tag'
         required: false
         type: string
+      prerelease:
+        description: 'Prerelease'
+        required: true
+        type: boolean
 jobs:
   release:
     runs-on: windows-latest
@@ -26,7 +30,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: actions/setup-python@v4
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -34,7 +38,7 @@ jobs:
       run: pip install conan
 
     - name: Load Conan cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.conan2/p
         key: ${{ runner.os }}-conan-${{ hashFiles('src/**/conanfile.txt') }}
@@ -46,4 +50,5 @@ jobs:
         MINOR: ${{ inputs.minor }}
         PATCH: ${{ inputs.patch }}
         TAG: ${{ inputs.tag }}
+        PRERELEASE: ${{ inputs.prerelease }}
         ACCESS_TOKEN: ${{ secrets.CONTENTS_ACCESS_TOKEN }}
