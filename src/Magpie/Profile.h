@@ -64,6 +64,8 @@ struct Profile {
 
 	// 对于打包应用，pathRule 存储 AUMID
 	std::wstring pathRule;
+	std::wstring truePath;
+	std::wstring GetTruePath() const noexcept;
 	std::wstring classNameRule;
 
 	// 允许 exe 和 lnk
