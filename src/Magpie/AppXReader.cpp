@@ -138,16 +138,11 @@ bool AppXReader::Initialize(HWND hWnd) noexcept {
 		}
 	}
 
-	// 使用 GetApplicationUserModelId 获取 AUMID
-	DWORD dwProcId = 0;
-	if (!GetWindowThreadProcessId(hWnd, &dwProcId)) {
-		Logger::Get().Win32Error("GetWindowThreadProcessId 失败");
-		return false;
-	}
-
-	wil::unique_process_handle hProc(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, dwProcId));
+	// 使用 GetWindowProcessHandle 获取进程句柄，该函数包含 fallback 机制
+	// 可以处理权限不足的情况
+	wil::unique_process_handle hProc = Win32Helper::GetWindowProcessHandle(hWnd);
 	if (!hProc) {
-		Logger::Get().Win32Error("OpenProcess 失败");
+		Logger::Get().Error("GetWindowProcessHandle 失败");
 		return false;
 	}
 
