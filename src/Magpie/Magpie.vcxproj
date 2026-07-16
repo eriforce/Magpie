@@ -39,7 +39,8 @@
   <Import Project="..\Common.Pre.props" />
   <PropertyGroup Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset Condition="$(VS17)">v143</PlatformToolset>
+    <PlatformToolset Condition="!$(VS17)">v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -372,6 +373,7 @@
       <DependentUpon>SettingsExpanderCornerRadiusConverter.idl</DependentUpon>
       <SubType>Code</SubType>
     </ClCompile>
+    <ClCompile Include="Profile.cpp" />
     <ClCompile Include="ShortcutService.cpp" />
     <ClCompile Include="Shortcut.cpp" />
     <ClCompile Include="IconHelper.cpp" />

@@ -6,6 +6,8 @@
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)pch.pch</PrecompiledHeaderOutputFile>
       <PreprocessorDefinitions>_WINDOWS;WIN32_LEAN_AND_MEAN;WINRT_LEAN_AND_MEAN;WINRT_NO_MODULE_LOCK;WIL_SUPPRESS_EXCEPTIONS;WIL_USE_STL=1;NOGDICAPMASKS;NOICONS;NOATOM;NOCLIPBOARD;NODRAWTEXT;NOMEMMGR;NOMETAFILE;NOMINMAX;NOOPENFILE;NOSCROLL;NOSERVICE;NOSOUND;NOTEXTMETRIC;NOCOMM;NOKANJI;NOHELP;NOPROFILER;NOMCX;NO_SHLWAPI_PATH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- 避免 phmap 中警告的临时方案，phmap 发布新版本后应删除 -->
+      <PreprocessorDefinitions>_SILENCE_CXX20_IS_ALWAYS_EQUAL_DEPRECATION_WARNING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(CommitId)' != ''">MP_COMMIT_ID=$(CommitId);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(MajorVersion)' != '' And '$(MinorVersion)' != '' And '$(PatchVersion)' != ''">MP_MAJOR_VERSION=$(MajorVersion);MP_MINOR_VERSION=$(MinorVersion);MP_PATCH_VERSION=$(PatchVersion);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(VersionTag)' != ''">MP_VERSION_TAG=$(VersionTag);%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -23,6 +25,8 @@
       <AdditionalOptions Condition="$(UseClangCL) And '$(Platform)' == 'x64'">/clang:-mcx16 %(AdditionalOptions)</AdditionalOptions>
       <!-- -march=native: 针对当前硬件生成优化代码 -->
       <AdditionalOptions Condition="$(UseClangCL) And $(UseNativeMicroArch)">/clang:-march=native %(AdditionalOptions)</AdditionalOptions>
+      <!-- 使用 clang-cl 编译时将 cppwinrt 生成的头文件视为系统头文件，禁用其中的编译警告 -->
+      <AdditionalOptions Condition="$(UseClangCL) And '$(GeneratedFilesDir)' != ''">/clang:-isystem /clang:"$(GeneratedFilesDir)\" %(AdditionalOptions)</AdditionalOptions>
       <!-- 修复编译 Shared 中源文件找不到 pch.h 的问题 -->
       <AdditionalIncludeDirectories Condition="$(UseClangCL)">.;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>

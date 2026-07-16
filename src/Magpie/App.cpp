@@ -99,6 +99,7 @@ App& App::Get() {
 
 App::App() {
 	UnhandledException([](IInspectable const&, UnhandledExceptionEventArgs const& e) {
+		Logger::Get().Error(to_string(e.Message()));
 		Logger::Get().ComCritical("未处理的异常", e.Exception().value);
 
 		if (IsDebuggerPresent()) {
