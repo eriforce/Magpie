@@ -22,13 +22,19 @@
   <!-- 编译选项 -->
   <Import Project="$(MSBuildThisFileDirectory)\BuildOptions.props" />
 
-  <PropertyGroup>
+  <PropertyGroup Label="Globals">
+    <!-- 检测 VS 版本：VS2022(v17) 使用 v143，VS2026(v18) 使用 v145 -->
+    <VS17 Condition="$([System.String]::new('$(MSBuildVersion)').StartsWith('17'))">true</VS17>
+    <VS17 Condition="'$(VS17)' != 'true'">false</VS17>
+    <VCProjectVersion Condition="$(VS17)">17.0</VCProjectVersion>
+    <VCProjectVersion Condition="!$(VS17)">18.0</VCProjectVersion>
     <DefaultLanguage>en-US</DefaultLanguage>
   </PropertyGroup>
 
   <PropertyGroup Label="Configuration">
     <PlatformToolset Condition="$(UseClangCL)">ClangCL</PlatformToolset>
-    <PlatformToolset Condition="!$(UseClangCL)">v143</PlatformToolset>
+    <PlatformToolset Condition="!$(UseClangCL) And $(VS17)">v143</PlatformToolset>
+    <PlatformToolset Condition="!$(UseClangCL) And !$(VS17)">v145</PlatformToolset>
     <UseDebugLibraries Condition="'$(Configuration)' == 'Debug'">true</UseDebugLibraries>
     <WholeProgramOptimization Condition="'$(Configuration)' == 'Release'">true</WholeProgramOptimization>
   </PropertyGroup>
