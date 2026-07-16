@@ -358,6 +358,7 @@ private:
 		Profile& profile,
 		bool isDefault = false
 	) const noexcept;
+	winrt::fire_and_forget _SetTruePath(Profile& profile) const;
 	bool _SetDefaultShortcuts() noexcept;
 	void _SetDefaultScalingModes() noexcept;
 
