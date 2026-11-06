@@ -36,8 +36,10 @@ enum class TakeScreenshotResult {
 	InternalError
 };
 
-// 大多数时候会在最后添加 Bicubic 来降采样或升采样，因此缓存在内存中
-static EffectDesc bicubicDesc;
+// 大多数时候会在最后添加 Bicubic 来降采样或升采样，因此缓存在内存中。
+// 放大和缩小使用不同的参数且参数会内联到着色器中，因此需要分别编译
+// [0] 为放大用（B=0, C=0.5），[1] 为缩小用（B=C=1/3）
+static EffectDesc bicubicDescs[2];
 
 Renderer::Renderer() noexcept {}
 
@@ -607,48 +609,85 @@ void Renderer::_UpdateActiveEffectDescs() noexcept {
 	if (drawerCount > effectCount) {
 		// 已追加 Bicubic
 		assert(drawerCount == effectCount + 1);
-		_activeEffectDescs[effectCount] = &bicubicDesc;
+		_activeEffectDescs[effectCount] = &bicubicDescs[_bicubicDownscale ? 1 : 0];
 	}
 }
 
 bool Renderer::_ShouldAppendBicubic(ID3D11Texture2D* outTexture) noexcept {
-	const ScalingOptions& options = ScalingWindow::Get().Options();
-
 	D3D11_TEXTURE2D_DESC texDesc;
 	outTexture->GetDesc(&texDesc);
 	const SIZE lastOutputSize = { (LONG)texDesc.Width, (LONG)texDesc.Height };
 	const SIZE rendererSize = Win32Helper::GetSizeOfRect(ScalingWindow::Get().RendererRect());
 
-	if (options.IsWindowedMode()) {
-		// 窗口模式缩放时使用 Bicubic 放大。Bicubic (B=0, C=0.5) 的锐利度和 Lanczos 相差无几
+	if (ScalingWindow::Get().Options().IsWindowedMode()) {
+		// 窗口模式使用 Fill，只要尺寸不同就需要缩放
 		return lastOutputSize != rendererSize;
-	} else {
-		// 输出尺寸大于交换链尺寸则需要降采样
-		return lastOutputSize.cx > rendererSize.cx || lastOutputSize.cy > rendererSize.cy;
 	}
+
+	// 全屏模式。输出大于渲染尺寸时必须降采样
+	if (lastOutputSize.cx > rendererSize.cx || lastOutputSize.cy > rendererSize.cy) {
+		return true;
+	}
+
+	// 效果链未改变源尺寸时（如仅锐化），保持 1:1 居中呈现而不追加放大
+	D3D11_TEXTURE2D_DESC srcDesc;
+	_frameSource->GetOutput()->GetDesc(&srcDesc);
+	if (texDesc.Width == srcDesc.Width && texDesc.Height == srcDesc.Height) {
+		return false;
+	}
+
+	// 全屏模式使用 Fit。若一维已等于渲染尺寸且另一维塞得下，Fit 将是恒等变换，无需追加
+	const bool alreadyFits =
+		(lastOutputSize.cx == rendererSize.cx && lastOutputSize.cy <= rendererSize.cy) ||
+		(lastOutputSize.cy == rendererSize.cy && lastOutputSize.cx <= rendererSize.cx);
+	return !alreadyFits;
 }
 
-bool Renderer::_AppendBicubic(ID3D11Texture2D** inOutTexture) noexcept {
+// 任一维度需要缩小则按缩小处理，优先选择抗锯齿更好的插值核
+static bool IsBicubicDownscale(ID3D11Texture2D* inputTexture) noexcept {
+	D3D11_TEXTURE2D_DESC texDesc;
+	inputTexture->GetDesc(&texDesc);
+	const SIZE rendererSize = Win32Helper::GetSizeOfRect(ScalingWindow::Get().RendererRect());
+	return texDesc.Width > (UINT)rendererSize.cx || texDesc.Height > (UINT)rendererSize.cy;
+}
+
+static EffectOption GetBicubicOption(bool downscale) noexcept {
 	const ScalingOptions& options = ScalingWindow::Get().Options();
 
-	const EffectOption bicubicOption{
+	// 放大使用 Catmull-Rom（B=0, C=0.5），锐利度和 Lanczos 相差无几；
+	// 缩小使用 Mitchell（B=C=1/3），更柔和，锯齿和摩尔纹更少。
+	// 注意每个输出像素最多只参考周围 4x4 个输入像素，大比例缩小时仍可能出现锯齿
+	return EffectOption{
 		.name = "Bicubic",
 		.parameters{
-			{"paramB", 0.0f},
-			{"paramC", 0.5f}
+			{"paramB", downscale ? 1.0f / 3 : 0.0f},
+			{"paramC", downscale ? 1.0f / 3 : 0.5f}
 		},
 		.scalingType = options.IsWindowedMode() ? ScalingType::Fill : ScalingType::Fit
 	};
+}
+
+bool Renderer::_AppendBicubic(ID3D11Texture2D** inOutTexture) noexcept {
+	const bool downscale = IsBicubicDownscale(*inOutTexture);
+	_bicubicDownscale = downscale;
+
+	EffectDesc& bicubicDesc = bicubicDescs[downscale ? 1 : 0];
+	const EffectOption bicubicOption = GetBicubicOption(downscale);
 
 	if (bicubicDesc.name.empty()) {
 		// 参数不会改变，因此可以内联
 		std::optional<EffectDesc> desc = CompileEffect(bicubicOption, true, true);
 		if (!desc) {
-			Logger::Get().Error("编译降采样效果失败");
+			Logger::Get().Error("编译缩放效果失败");
 			return false;
 		}
 
 		bicubicDesc = std::move(*desc);
+	}
+
+	// 若已存在（放大/缩小变化导致重建）则替换最后一个 EffectDrawer，否则追加新的
+	if (_effectDrawers.size() > (uint32_t)ScalingWindow::Get().Options().effects.size()) {
+		_effectDrawers.pop_back();
 	}
 
 	EffectDrawer& bicubicDrawer = _effectDrawers.emplace_back();
@@ -659,7 +698,7 @@ bool Renderer::_AppendBicubic(ID3D11Texture2D** inOutTexture) noexcept {
 		_backendDescriptorStore,
 		inOutTexture
 	)) {
-		Logger::Get().Error("初始化降采样效果失败");
+		Logger::Get().Error("初始化缩放效果失败");
 		return false;
 	}
 
@@ -689,26 +728,34 @@ ID3D11Texture2D* Renderer::_ResizeEffects() noexcept {
 	bool changed = false;
 	if (_ShouldAppendBicubic(inOutTexture)) {
 		if (_effectDrawers.size() > effectCount) {
-			const EffectOption bicubicOption{
-				.name = "Bicubic",
-				.parameters{
-					{"paramB", 0.0f},
-					{"paramC", 0.5f}
-				},
-				.scalingType = options.IsWindowedMode() ? ScalingType::Fill : ScalingType::Fit
-			};
+			// 检查放大/缩小是否发生变化，变化则需重建（参数内联到着色器，无法仅调整尺寸）
+			const bool downscale = IsBicubicDownscale(inOutTexture);
 
-			if (!_effectDrawers.back().ResizeTextures(
-				bicubicDesc,
-				bicubicOption,
-				_backendResources,
-				&inOutTexture
-			)) {
-				Logger::Get().Error("更改效果 Bicubic 尺寸失败");
-				return nullptr;
+			if (downscale == _bicubicDownscale) {
+				EffectDesc& bicubicDesc = bicubicDescs[downscale ? 1 : 0];
+				const EffectOption bicubicOption = GetBicubicOption(downscale);
+
+				if (!_effectDrawers.back().ResizeTextures(
+					bicubicDesc,
+					bicubicOption,
+					_backendResources,
+					&inOutTexture
+				)) {
+					Logger::Get().Error("更改效果 Bicubic 尺寸失败");
+					return nullptr;
+				}
+			} else {
+				if (!_AppendBicubic(&inOutTexture)) {
+					Logger::Get().Error("_AppendBicubic 失败");
+					return nullptr;
+				}
+				changed = true;
 			}
 		} else {
-			_AppendBicubic(&inOutTexture);
+			if (!_AppendBicubic(&inOutTexture)) {
+				Logger::Get().Error("_AppendBicubic 失败");
+				return nullptr;
+			}
 			changed = true;
 		}
 	} else {

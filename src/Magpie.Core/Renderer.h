@@ -124,6 +124,9 @@ private:
 	std::unique_ptr<FrameSourceBase> _frameSource;
 	std::vector<EffectDrawer> _effectDrawers;
 
+	// 追加的 Bicubic 是放大还是缩小，用于 _UpdateActiveEffectDescs 选择对应的 EffectDesc
+	bool _bicubicDownscale = false;
+
 	StepTimer _stepTimer;
 	EffectsProfiler _effectsProfiler;
 
